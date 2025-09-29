@@ -39,4 +39,4 @@ Optionally, specifying `-r` followed by `J`, `U` or `E` sets the region to Japan
 | Start            | Return / Enter |
 | Mode             | F              |
 | Soft reset       | Tab            |
-
+| Quit             | Esc            |
