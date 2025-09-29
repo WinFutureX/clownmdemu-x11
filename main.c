@@ -120,15 +120,6 @@ void usage(const char * app_name)
 }
 
 /* emulator callbacks */
-cc_u8f emulator_callback_cartridge_read(void * const data, const cc_u32f addr)
-{
-	emulator * e = (emulator *) data;
-	return addr < e->rom_size ? e->rom[addr] : 0;
-}
-
-void emulator_callback_cartridge_write(void * const data, const cc_u32f addr, const cc_u8f val)
-{}
-
 void emulator_callback_color_update(void * const data, const cc_u16f idx, const cc_u16f color)
 {
 	emulator * e = (emulator *) data;
