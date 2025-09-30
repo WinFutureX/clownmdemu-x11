@@ -1,4 +1,5 @@
 # ClownMDEmu-X11
+
 Minimum viable product for X11 systems, using [Clownacy's ClownMDEmu core](https://github.com/Clownacy/clownmdemu-core).
 
 What you get:
@@ -12,18 +13,23 @@ What you **don't** get:
 - Remappable controls
 
 ## Building
+
 ```
 $ git clone https://github.com/WinFutureX/clownmdemu-x11
 $ cd clownmdemu-x11
 $ git submodule update --init --recursive
 $ make
 ```
+
 ## Running
+
 ``` $ ./clownmdemu FILE ```
+
 The file in question can be a ROM or a BIN/CUE disc image.
 Optionally, specifying `-r` followed by `J`, `U` or `E` sets the region to Japan, US or Europe respectively.
 
 ## Controls
+
 | Emulated console | Host system    |
 | ---------------- | -------------- |
 | Up               | Up             |
@@ -40,3 +46,7 @@ Optionally, specifying `-r` followed by `J`, `U` or `E` sets the region to Japan
 | Mode             | F              |
 | Soft reset       | Tab            |
 | Quit             | Esc            |
+
+## Licence
+
+This app itself is licensed under GPLv3 (see `LICENSE.txt`), while the emulator core and associated libraries are licensed under AGPLv3 (see `common/LICENCE.txt`).
