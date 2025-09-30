@@ -14,16 +14,18 @@ What you **don't** get:
 
 ## Building
 
-```
+``` bash
 $ git clone https://github.com/WinFutureX/clownmdemu-x11
 $ cd clownmdemu-x11
 $ git submodule update --init --recursive
-$ make
+$ make # or gmake on OpenBSD
 ```
 
 ## Running
 
-``` $ ./clownmdemu FILE ```
+``` bash
+$ ./clownmdemu FILE
+```
 
 The file in question can be a ROM or a BIN/CUE disc image.
 Optionally, specifying `-r` followed by `J`, `U` or `E` sets the region to Japan, US or Europe respectively.
