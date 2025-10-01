@@ -24,7 +24,7 @@
 /* for timespec and clock_gettime */
 #define _POSIX_C_SOURCE 199309L
 
-/* CLOCK_MONOTONIC RAW is linux-only */
+/* CLOCK_MONOTONIC_RAW is linux-only */
 #ifndef CLOCK_MONOTONIC_RAW
 #define CLOCK_MONOTONIC_RAW CLOCK_MONOTONIC
 #endif
@@ -59,8 +59,6 @@
 
 #define BILLION 1000000000L
 #define ROM_SIZE_MAX 0x800000
-#define WIDTH VDP_MAX_SCANLINE_WIDTH
-#define HEIGHT VDP_MAX_SCANLINES
 
 enum
 {
@@ -96,6 +94,7 @@ typedef struct emulator
 	uint32_t framebuffer[VDP_MAX_SCANLINE_WIDTH * VDP_MAX_SCANLINES];
 	cc_bool buttons[2][CLOWNMDEMU_BUTTON_MAX];
 	char rom_regions[4]; /* includes '\0' at end */
+	cc_bool log_enabled;
 } emulator;
 
 /* utility functions */
@@ -113,8 +112,10 @@ void usage(const char * app_name)
 	printf(
 		"Usage: %s [OPTIONS] FILE\n"
 		"Options:\n"
-		"        -h, -?     print this help text\n"
-		"        -r (U|J|E) set region to US, Japan or Europe respectively\n",
+		"        -h, -?     Print this help text\n"
+		"        -r (U|J|E) Set region to US, Japan or Europe respectively\n"
+		"        -l         Enable emulator core log output (disabled by default)\n"
+		"        -w         Enable widescreen hack (disabled by default)\n",
 		app_name
 	);
 }
@@ -253,9 +254,13 @@ cc_bool emulator_callback_save_file_size_obtain(void * const data, const char * 
 
 void emulator_callback_log(void * const data, const char * fmt, va_list args)
 {
-	printf("core: ");
-	vprintf(fmt, args);
-	printf("\n");
+	emulator * e = (emulator *) data;
+	if (e->log_enabled == cc_true)
+	{
+		printf("core: ");
+		vprintf(fmt, args);
+		printf("\n");
+	}
 }
 
 void * emulator_callback_clowncd_open(const char * filename, ClownCD_FileMode mode)
@@ -468,6 +473,15 @@ void emulator_set_region(emulator * emu, int force_region)
 	}
 }
 
+void emulator_set_options(emulator * emu, cc_bool log_enabled, cc_bool widescreen_enabled)
+{
+	emu->log_enabled = log_enabled;
+	if (widescreen_enabled == cc_true)
+	{
+		emu->configuration.vdp.widescreen_enabled = cc_true;
+	}
+}
+
 void emulator_reset(emulator * emu)
 {
 	ClownMDEmu_Reset(&emu->clownmdemu, emu->cd_boot);
@@ -661,6 +675,10 @@ int main(int argc, char ** argv)
 	
 	emulator * emu;
 	
+	cc_bool log_enabled;
+	cc_bool widescreen_enabled;
+	int width;
+	int height;
 	int region;
 	const char * filename;
 	int i;
@@ -693,6 +711,8 @@ int main(int argc, char ** argv)
 		return 1;
 	}
 	
+	log_enabled = cc_false;
+	widescreen_enabled = cc_false;
 	region = REGION_UNSPECIFIED;
 	filename = NULL;
 	
@@ -746,6 +766,12 @@ int main(int argc, char ** argv)
 						}
 					}
 					break;
+				case 'l':
+					log_enabled = cc_true;
+					break;
+				case 'w':
+					widescreen_enabled = cc_true;
+					break;
 				default:
 					printf("unknown flag %s\n", argv[i]);
 					usage(argv[0]);
@@ -773,6 +799,9 @@ int main(int argc, char ** argv)
 		return 1;
 	}
 	
+	width = widescreen_enabled == cc_true ? VDP_MAX_SCANLINE_WIDTH - (VDP_TILE_PAIR_COUNT * VDP_TILE_WIDTH) : VDP_H40_SCREEN_WIDTH_IN_TILE_PAIRS * VDP_TILE_PAIR_WIDTH;
+	height = VDP_MAX_SCANLINES;
+	
 	emu = (emulator *) malloc(sizeof(emulator));
 	if (!emu)
 	{
@@ -799,7 +828,7 @@ int main(int argc, char ** argv)
 	window_attr.background_pixel = 0;
 	window_attr.colormap = XCreateColormap(display, root, vis_info.visual, AllocNone);
 	window_attr.event_mask = KeyPressMask | KeyReleaseMask;
-	window = XCreateWindow(display, root, 0, 0, WIDTH, HEIGHT, 0, vis_info.depth, InputOutput, vis_info.visual, attr_mask, &window_attr);
+	window = XCreateWindow(display, root, 0, 0, width, height, 0, vis_info.depth, InputOutput, vis_info.visual, attr_mask, &window_attr);
 	if (!window)
 	{
 		printf("no window\n");
@@ -807,14 +836,14 @@ int main(int argc, char ** argv)
 	}
 	XStoreName(display, window, "clownmdemu");
 	hints.flags |= PMinSize;
-	hints.min_width = WIDTH;
-	hints.min_height = HEIGHT;
+	hints.min_width = width;
+	hints.min_height = height;
 	hints.max_width = 0;
 	hints.max_height = 0;
 	XSetWMNormalHints(display, window, &hints);
 	XMapWindow(display, window);
 	XFlush(display);
-	x_window_buffer = XCreateImage(display, vis_info.visual, vis_info.depth, ZPixmap, 0, (char *) emu->framebuffer, WIDTH, HEIGHT, 32, 0);
+	x_window_buffer = XCreateImage(display, vis_info.visual, vis_info.depth, ZPixmap, 0, (char *) emu->framebuffer, width, height, 32, 0);
 	if (!x_window_buffer)
 	{
 		printf("no image\n");
@@ -867,7 +896,7 @@ int main(int argc, char ** argv)
 	
 	/* init emu */
 	emulator_init(emu);
-	
+	emulator_set_options(emu, log_enabled, widescreen_enabled);
 	if (!emulator_load_file(emu, filename))
 	{
 		printf("unable to load file\n");
@@ -942,12 +971,12 @@ int main(int argc, char ** argv)
 		
 		emulator_iterate(emu);
 		
-		if (emu->width > 0 || emu->height > 0)
+		if (emu->width > 0 && emu->height > 0)
 		{
 			x_window_buffer->width = emu->width;
 			x_window_buffer->height = emu->height;
 			x_window_buffer->bytes_per_line = emu->width * 4;
-			XPutImage(display, window, default_gc, x_window_buffer, 0, 0, 0, 0, WIDTH, HEIGHT);
+			XPutImage(display, window, default_gc, x_window_buffer, 0, 0, (width - emu->width) / 2, (height - emu->height) / 2, width, height);
 		}
 		
 #if defined(__linux__)
