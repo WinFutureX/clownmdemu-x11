@@ -95,6 +95,8 @@ typedef struct emulator
 	cc_bool buttons[2][CLOWNMDEMU_BUTTON_MAX];
 	char rom_regions[4]; /* includes '\0' at end */
 	cc_bool log_enabled;
+	
+	FILE * bram;
 } emulator;
 
 /* utility functions */
@@ -223,33 +225,71 @@ size_t emulator_callback_cd_audio_read(void * const data, cc_s16l * const buf, c
 
 cc_bool emulator_callback_save_file_open_read(void * const data, const char * const filename)
 {
-	return cc_false;
+	emulator * e = (emulator *) data;
+	e->bram = fopen(filename, "r+b");
+	return e->bram ? cc_true : cc_false;
 }
 
 cc_s16f emulator_callback_save_file_read(void * const data)
 {
-	return -1;
+	emulator * e = (emulator *) data;
+	uint8_t byte;
+	if (!e->bram)
+	{
+		return -1;
+	}
+	else
+	{
+		return fread(&byte, 1, 1, e->bram) < 1 ? -1 : byte;
+	}
 }
 
 cc_bool emulator_callback_save_file_open_write(void * const data, const char * const filename)
 {
-	return cc_false;
+	emulator * e = (emulator *) data;
+	e->bram = fopen(filename, "w+b");
+	return e->bram ? cc_true : cc_false;
 }
 
 void emulator_callback_save_file_write(void * const data, const cc_u8f val)
-{}
+{
+	emulator * e = (emulator *) data;
+	if (e->bram)
+	{
+		fwrite(&val, 1, 1, e->bram);
+	}
+}
 
 void emulator_callback_save_file_close(void * const data)
-{}
+{
+	emulator * e = (emulator *) data;
+	if (e->bram)
+	{
+		fclose(e->bram);
+	}
+}
 
 cc_bool emulator_callback_save_file_remove(void * const data, const char * const filename)
 {
-	return cc_false;
+	return remove(filename) == 0 ? cc_true : cc_false;
 }
 
 cc_bool emulator_callback_save_file_size_obtain(void * const data, const char * const filename, size_t * const size)
 {
-	return cc_false;
+	emulator * e = (emulator *) data;
+	int file_size = 0;
+	e->bram = fopen(filename, "rb");
+	if (e->bram)
+	{
+		fseek(e->bram, 0, SEEK_END);
+		file_size = ftell(e->bram);
+		fclose(e->bram);
+		if (file_size > 0)
+		{
+			*size = file_size;
+		}
+	}
+	return file_size > 0 ? cc_true : cc_false;
 }
 
 void emulator_callback_log(void * const data, const char * fmt, va_list args)

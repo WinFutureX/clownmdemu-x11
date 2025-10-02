@@ -6,10 +6,12 @@ What you get:
 - Sega Mega Drive and Mega-CD emulation
 - Audio support (via PulseAudio on Linux or sndio on OpenBSD)
 - Region autodetection (for cartridges only)
+- Mega-CD save RAM
 
 What you **don't** get:
 - A pretty UI
-- Save support, whether as save states or backup RAM
+- Save states
+- Cartridge save RAM
 - Remappable controls
 
 ## Building
