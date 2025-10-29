@@ -38,6 +38,7 @@
 #include <sys/stat.h>
 #include <arpa/inet.h>
 
+#ifndef DISABLE_AUDIO
 #if defined(__linux__)
 /* inline not available in c89, so stub it out */
 #define inline
@@ -45,6 +46,7 @@
 #include <pulse/error.h>
 #elif defined(__OpenBSD__)
 #include <sndio.h>
+#endif
 #endif
 
 #include <X11/Xlib.h>
@@ -736,6 +738,7 @@ int main(int argc, char ** argv)
 	XImage * x_window_buffer;
 	GC default_gc;
 	XSizeHints hints;
+#ifndef DISABLE_AUDIO
 #if defined(__linux__)
 	pa_simple * audio_device;
 	pa_sample_spec audio_params;
@@ -743,6 +746,7 @@ int main(int argc, char ** argv)
 #elif defined(__OpenBSD__)
 	struct sio_hdl * audio_device;
 	struct sio_par audio_params;
+#endif
 #endif
 	
 	if (argc < 2)
@@ -897,6 +901,7 @@ int main(int argc, char ** argv)
 		return 1;
 	}
 
+#ifndef DISABLE_AUDIO
 	/* init audio */
 #if defined(__linux__)
 	audio_params.format = PA_SAMPLE_S16LE;
@@ -932,6 +937,7 @@ int main(int argc, char ** argv)
 		printf("unable to start audio device\n");
 		return 1;
 	}
+#endif
 #endif
 	
 	/* init emu */
@@ -1019,10 +1025,12 @@ int main(int argc, char ** argv)
 			XPutImage(display, window, default_gc, x_window_buffer, 0, 0, (width - emu->width) / 2, (height - emu->height) / 2, width, height);
 		}
 		
+#ifndef DISABLE_AUDIO
 #if defined(__linux__)
 		pa_simple_write(audio_device, emu->samples, emu->audio_bytes, &audio_error);
 #elif defined(__OpenBSD__)
 		sio_write(audio_device, emu->samples, emu->audio_bytes);
+#endif
 #endif
 		
 		clock_gettime(CLOCK_MONOTONIC_RAW, &end_timespec);
@@ -1041,12 +1049,14 @@ int main(int argc, char ** argv)
 	
 	emulator_shutdown(emu);
 	free(emu);
+#ifndef DISABLE_AUDIO
 #if defined(__linux__)
 	pa_simple_drain(audio_device, &audio_error);
 	pa_simple_free(audio_device);
 #elif defined(__OpenBSD__)
 	sio_stop(audio_device);
 	sio_close(audio_device);
+#endif
 #endif
 	return 0;
 }
