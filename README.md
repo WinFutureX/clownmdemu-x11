@@ -23,7 +23,7 @@ $ git submodule update --init --recursive
 $ make # or gmake on OpenBSD
 ```
 
-Note: Only Linux and OpenBSD have been tested at this time. Building for other platforms can be done by appending `DISABLE_AUDIO=1` or `DISABLE_AUDIO=y` to the `make` command, at the cost of audio output support.
+Only Linux and OpenBSD have been tested at this time. Building for other platforms can be done by appending `DISABLE_AUDIO=1` or `DISABLE_AUDIO=y` to the `make` command, at the cost of audio output support.
 
 Debugging symbols can also be added to the executable with `DEBUG=1` or `DEBUG=y`.
 
