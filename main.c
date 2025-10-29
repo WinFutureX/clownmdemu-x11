@@ -879,11 +879,11 @@ int main(int argc, char ** argv)
 		return 1;
 	}
 	XStoreName(display, window, "clownmdemu");
-	hints.flags |= PMinSize;
+	hints.flags = PMinSize | PMaxSize;
 	hints.min_width = width;
 	hints.min_height = height;
-	hints.max_width = 0;
-	hints.max_height = 0;
+	hints.max_width = width;
+	hints.max_height = height;
 	XSetWMNormalHints(display, window, &hints);
 	XMapWindow(display, window);
 	XFlush(display);
