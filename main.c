@@ -24,11 +24,6 @@
 /* for timespec and clock_gettime */
 #define _POSIX_C_SOURCE 199309L
 
-/* CLOCK_MONOTONIC_RAW is linux-only */
-#ifndef CLOCK_MONOTONIC_RAW
-#define CLOCK_MONOTONIC_RAW CLOCK_MONOTONIC
-#endif
-
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -37,6 +32,11 @@
 #include <limits.h>
 #include <sys/stat.h>
 #include <arpa/inet.h>
+
+/* CLOCK_MONOTONIC_RAW is linux-only */
+#ifndef CLOCK_MONOTONIC_RAW
+#define CLOCK_MONOTONIC_RAW CLOCK_MONOTONIC
+#endif
 
 #ifndef DISABLE_AUDIO
 #if defined(__linux__)
@@ -1014,6 +1014,8 @@ int main(int argc, char ** argv)
 					break;
 			}
 		}
+		
+		XClearWindow(display, window);
 		
 		emulator_iterate(emu);
 		
