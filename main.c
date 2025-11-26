@@ -527,7 +527,11 @@ int emulator_callback_clowncd_seek(void * const stream, const long pos, const Cl
 
 void emulator_callback_clowncd_log(void * const data, const char * const msg)
 {
-	printf("clowncd: %s\n", msg);
+	emulator * e = (emulator *) data;
+	if (e->log_enabled == cc_true)
+	{
+		printf("clowncd: %s\n", msg);
+	}
 }
 
 void emulator_callback_mixer_complete(void * const data, const cc_s16l * samples, const size_t frames)
