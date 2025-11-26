@@ -234,6 +234,8 @@ char * build_file_path(const char * path, const char * filename)
 	ret[ret_size - 1] = 0;
 	strncat(ret, filename, ret_size - 1);
 	ret[ret_size - 1] = 0;
+	
+	/* you must free file names after using them! */
 	return ret;
 }
 
@@ -347,6 +349,7 @@ cc_bool emulator_callback_save_file_open_read(void * const data, const char * co
 		return cc_false;
 	}
 	e->bram = fopen(file_path, "r+b");
+	free(file_path);
 	return e->bram ? cc_true : cc_false;
 }
 
@@ -373,6 +376,7 @@ cc_bool emulator_callback_save_file_open_write(void * const data, const char * c
 		return cc_false;
 	}
 	e->bram = fopen(file_path, "w+b");
+	free(file_path);
 	return e->bram ? cc_true : cc_false;
 }
 
@@ -396,12 +400,15 @@ void emulator_callback_save_file_close(void * const data)
 
 cc_bool emulator_callback_save_file_remove(void * const data, const char * const filename)
 {
+	int status;
 	char * file_path = build_file_path(exe_dir, filename);
 	if (!file_path)
 	{
 		return cc_false;
 	}
-	return remove(file_path) == 0 ? cc_true : cc_false;
+	status = remove(file_path);
+	free(file_path);
+	return status == 0 ? cc_true : cc_false;
 }
 
 cc_bool emulator_callback_save_file_size_obtain(void * const data, const char * const filename, size_t * const size)
@@ -414,6 +421,7 @@ cc_bool emulator_callback_save_file_size_obtain(void * const data, const char * 
 		return cc_false;
 	}
 	e->bram = fopen(file_path, "rb");
+	free(file_path);
 	if (e->bram)
 	{
 		fseek(e->bram, 0, SEEK_END);
