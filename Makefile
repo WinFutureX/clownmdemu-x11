@@ -13,7 +13,7 @@ AUDIO_CFLAGS := -DDISABLE_AUDIO
 else
 ifeq ($(OS), Linux)
 AUDIO_CFLAGS := $(shell pkg-config libpulse-simple --cflags)
-AUDIO_LDFLAGS := $(shell pkg-config libpulse-simple --libs)
+AUDIO_LDFLAGS := $(shell pkg-config libpulse-simple --libs) -lrt
 else ifeq ($(OS), OpenBSD)
 AUDIO_LDFLAGS := -lsndio
 endif
@@ -26,7 +26,7 @@ OPT_CFLAGS := -O2
 endif
 
 CFLAGS := -std=c89 -pedantic $(OPT_CFLAGS) $(X11_CFLAGS) $(AUDIO_CFLAGS)
-LDFLAGS := -lm -lrt $(X11_LDFLAGS) $(AUDIO_LDFLAGS)
+LDFLAGS := -lm $(X11_LDFLAGS) $(AUDIO_LDFLAGS)
 
 OBJS = main.o common.o
 

@@ -145,6 +145,7 @@ int exe_dir_init(char * argv0, char * result, size_t result_size)
 {
 	char new_path[PATH_MAX];
 	char new_path_2[PATH_MAX];
+	char * dir_tmp;
 	
 	getcwd(save_pwd, sizeof(save_pwd));
 	strncpy(save_argv0, argv0, sizeof(save_argv0));
@@ -159,9 +160,9 @@ int exe_dir_init(char * argv0, char * result, size_t result_size)
 		realpath(save_argv0, new_path);
 		if (!access(new_path, F_OK))
 		{
-			strncpy(result, new_path, result_size);
+			dir_tmp = dirname(new_path);
+			strncpy(result, dir_tmp, result_size);
 			result[result_size - 1] = 0;
-			dirname(result);
 			return 1;
 		}
 		else
@@ -181,9 +182,9 @@ int exe_dir_init(char * argv0, char * result, size_t result_size)
 		realpath(new_path_2, new_path);
 		if (!access(new_path, F_OK))
 		{
-			strncpy(result, new_path, result_size);
+			dir_tmp = dirname(new_path);
+			strncpy(result, dir_tmp, result_size);
 			result[result_size - 1] = 0;
-			dirname(result);
 			return 1;
 		}
 		else
@@ -207,9 +208,9 @@ int exe_dir_init(char * argv0, char * result, size_t result_size)
 			realpath(new_path_2, new_path);
 			if (!access(new_path, F_OK))
 			{
-				strncpy(result, new_path, result_size);
+				dir_tmp = dirname(new_path);
+				strncpy(result, dir_tmp, result_size);
 				result[result_size - 1] = 0;
-				dirname(result);
 				return 1;
 			}
 		}
