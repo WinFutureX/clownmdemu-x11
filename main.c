@@ -85,7 +85,6 @@ const char path_sep_str[2] = "/";
 const char path_list_sep[8] = ":"; /* could be ":;" */
 
 char exe_dir[PATH_MAX];
-int exe_dir_initialized;
 
 /* emulator stuff */
 typedef struct emulator
@@ -223,8 +222,18 @@ int exe_dir_init(char * argv0, char * result, size_t result_size)
 
 char * build_file_path(const char * path, const char * filename)
 {
-	int ret_size = PATH_MAX * sizeof(char);
-	char * ret = malloc(ret_size);
+	int ret_size;
+	char * ret;
+	if (!path || !filename)
+	{
+		return NULL;
+	}
+	if (path[0] == '\0' || filename[0] == '\0')
+	{
+		return NULL;
+	}
+	ret_size = PATH_MAX * sizeof(char);
+	ret = malloc(ret_size);
 	if (!ret)
 	{
 		return NULL;
@@ -989,8 +998,7 @@ int main(int argc, char ** argv)
 		return 1;
 	}
 	
-	exe_dir_initialized = exe_dir_init(argv[0], exe_dir, sizeof(exe_dir));
-	if (!exe_dir_initialized)
+	if (!exe_dir_init(argv[0], exe_dir, sizeof(exe_dir)))
 	{
 		warn("unable to get executable directory, saves will not be available!\n");
 	}
