@@ -24,12 +24,17 @@
 /* for timespec and clock_gettime */
 #define _POSIX_C_SOURCE 199309L
 
+/* for realpath */
+#define _XOPEN_SOURCE 500
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <limits.h>
+#include <unistd.h>
+#include <libgen.h>
 #include <sys/stat.h>
 #include <arpa/inet.h>
 
@@ -69,6 +74,18 @@ enum
 	REGION_JP,
 	REGION_EU
 };
+
+/* path stuff */
+char save_pwd[PATH_MAX];
+char save_argv0[PATH_MAX];
+char save_path[PATH_MAX];
+
+const char path_sep = '/';
+const char path_sep_str[2] = "/";
+const char path_list_sep[8] = ":"; /* could be ":;" */
+
+char exe_dir[PATH_MAX];
+int exe_dir_initialized;
 
 /* emulator stuff */
 typedef struct emulator
@@ -122,6 +139,102 @@ void usage(const char * app_name)
 		"        -w         Enable widescreen hack (disabled by default)\n",
 		app_name
 	);
+}
+
+int exe_dir_init(char * argv0, char * result, size_t result_size)
+{
+	char new_path[PATH_MAX];
+	char new_path_2[PATH_MAX];
+	
+	getcwd(save_pwd, sizeof(save_pwd));
+	strncpy(save_argv0, argv0, sizeof(save_argv0));
+	save_argv0[sizeof(save_argv0) - 1] = 0;
+	strncpy(save_path, getenv("PATH"), sizeof(save_path));
+	save_path[sizeof(save_path) - 1] = 0;
+	
+	result[0] = 0;
+	if (save_argv0[0] == path_sep)
+	{
+		/* absolute path */
+		realpath(save_argv0, new_path);
+		if (!access(new_path, F_OK))
+		{
+			strncpy(result, new_path, result_size);
+			result[result_size - 1] = 0;
+			dirname(result);
+			return 1;
+		}
+		else
+		{
+			perror("access 1");
+		}
+	}
+	else if (strchr(save_argv0, path_sep))
+	{
+		/* relative path */
+		strncpy(new_path_2, save_pwd, sizeof(new_path_2));
+		new_path_2[sizeof(new_path_2) - 1] = 0;
+		strncat(new_path_2, path_sep_str, sizeof(new_path_2) - 1);
+		new_path_2[sizeof(new_path_2) - 1] = 0;
+		strncat(new_path_2, save_argv0, sizeof(new_path_2) - 1);
+		new_path_2[sizeof(new_path_2) - 1] = 0;
+		realpath(new_path_2, new_path);
+		if (!access(new_path, F_OK))
+		{
+			strncpy(result, new_path, result_size);
+			result[result_size - 1] = 0;
+			dirname(result);
+			return 1;
+		}
+		else
+		{
+			perror("access 2");
+		}
+	}
+	else
+	{
+		/* search $PATH */
+		char * save_ptr;
+		char * path_item;
+		for (path_item = strtok_r(save_path, path_list_sep, &save_ptr); path_item; path_item = strtok_r(NULL, path_list_sep, &save_ptr))
+		{
+			strncpy(new_path_2, path_item, sizeof(new_path_2));
+			new_path_2[sizeof(new_path_2) - 1] = 0;
+			strncat(new_path_2, path_sep_str, sizeof(new_path_2) - 1);
+			new_path_2[sizeof(new_path_2) - 1] = 0;
+			strncat(new_path_2, save_argv0, sizeof(new_path_2) - 1);
+			new_path_2[sizeof(new_path_2) - 1] = 0;
+			realpath(new_path_2, new_path);
+			if (!access(new_path, F_OK))
+			{
+				strncpy(result, new_path, result_size);
+				result[result_size - 1] = 0;
+				dirname(result);
+				return 1;
+			}
+		}
+		/* end for */
+		perror("access 3");
+	}
+	/* if we have reached here, we have exhausted all methods, so give up */
+	return 0;
+}
+
+char * build_file_path(const char * path, const char * filename)
+{
+	int ret_size = PATH_MAX * sizeof(char);
+	char * ret = malloc(ret_size);
+	if (!ret)
+	{
+		return NULL;
+	}
+	strncpy(ret, path, ret_size - 1);
+	ret[ret_size - 1] = 0;
+	strncat(ret, path_sep_str, ret_size - 1);
+	ret[ret_size - 1] = 0;
+	strncat(ret, filename, ret_size - 1);
+	ret[ret_size - 1] = 0;
+	return ret;
 }
 
 /* emulator callbacks */
@@ -228,7 +341,12 @@ size_t emulator_callback_cd_audio_read(void * const data, cc_s16l * const buf, c
 cc_bool emulator_callback_save_file_open_read(void * const data, const char * const filename)
 {
 	emulator * e = (emulator *) data;
-	e->bram = fopen(filename, "r+b");
+	char * file_path = build_file_path(exe_dir, filename);
+	if (!file_path)
+	{
+		return cc_false;
+	}
+	e->bram = fopen(file_path, "r+b");
 	return e->bram ? cc_true : cc_false;
 }
 
@@ -249,7 +367,12 @@ cc_s16f emulator_callback_save_file_read(void * const data)
 cc_bool emulator_callback_save_file_open_write(void * const data, const char * const filename)
 {
 	emulator * e = (emulator *) data;
-	e->bram = fopen(filename, "w+b");
+	char * file_path = build_file_path(exe_dir, filename);
+	if (!file_path)
+	{
+		return cc_false;
+	}
+	e->bram = fopen(file_path, "w+b");
 	return e->bram ? cc_true : cc_false;
 }
 
@@ -273,14 +396,24 @@ void emulator_callback_save_file_close(void * const data)
 
 cc_bool emulator_callback_save_file_remove(void * const data, const char * const filename)
 {
-	return remove(filename) == 0 ? cc_true : cc_false;
+	char * file_path = build_file_path(exe_dir, filename);
+	if (!file_path)
+	{
+		return cc_false;
+	}
+	return remove(file_path) == 0 ? cc_true : cc_false;
 }
 
 cc_bool emulator_callback_save_file_size_obtain(void * const data, const char * const filename, size_t * const size)
 {
 	emulator * e = (emulator *) data;
 	int file_size = 0;
-	e->bram = fopen(filename, "rb");
+	char * file_path = build_file_path(exe_dir, filename);
+	if (!file_path)
+	{
+		return cc_false;
+	}
+	e->bram = fopen(file_path, "rb");
 	if (e->bram)
 	{
 		fseek(e->bram, 0, SEEK_END);
@@ -841,6 +974,12 @@ int main(int argc, char ** argv)
 	{
 		printf("no filename specified\n");
 		return 1;
+	}
+	
+	exe_dir_initialized = exe_dir_init(argv[0], exe_dir, sizeof(exe_dir));
+	if (!exe_dir_initialized)
+	{
+		warn("unable to get executable directory, saves will not be available!\n");
 	}
 	
 	width = widescreen_enabled == cc_true ? VDP_MAX_SCANLINE_WIDTH - (VDP_TILE_PAIR_COUNT * VDP_TILE_WIDTH) : VDP_H40_SCREEN_WIDTH_IN_TILE_PAIRS * VDP_TILE_PAIR_WIDTH;
