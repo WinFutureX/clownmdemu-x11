@@ -1019,7 +1019,7 @@ int main(int argc, char ** argv)
 	display = XOpenDisplay(0);
 	if (!display)
 	{
-		printf("no display\n");
+		printf("unable to open display\n");
 		return 1;
 	}
 	root = DefaultRootWindow(display);
@@ -1035,7 +1035,7 @@ int main(int argc, char ** argv)
 	window = XCreateWindow(display, root, 0, 0, width, height, 0, vis_info.depth, InputOutput, vis_info.visual, attr_mask, &window_attr);
 	if (!window)
 	{
-		printf("no window\n");
+		printf("unable to create window\n");
 		return 1;
 	}
 	XStoreName(display, window, "clownmdemu");
@@ -1050,14 +1050,14 @@ int main(int argc, char ** argv)
 	x_window_buffer = XCreateImage(display, vis_info.visual, vis_info.depth, ZPixmap, 0, (char *) emu->framebuffer, width, height, 32, 0);
 	if (!x_window_buffer)
 	{
-		printf("no image\n");
+		printf("unable to create window image\n");
 		return 1;
 	}
 	default_gc = DefaultGC(display, default_screen);
 	wm_delete_window = XInternAtom(display, "WM_DELETE_WINDOW", False);
 	if (!XSetWMProtocols(display, window, &wm_delete_window, 1))
 	{
-		printf("no close\n");
+		printf("unable to intercept window close event\n");
 		return 1;
 	}
 
@@ -1135,18 +1135,10 @@ int main(int argc, char ** argv)
 			XNextEvent(display, &ev);
 			switch (ev.type)
 			{
-				case DestroyNotify:
-					ed = (XDestroyWindowEvent *) &ev;
-					if (ed->window == window)
-					{
-						running = 0;
-					}
-					break;
 				case ClientMessage:
 					ec = (XClientMessageEvent *) &ev;
 					if ((Atom) ec->data.l[0] == wm_delete_window)
 					{
-						XDestroyWindow(display, window);
 						running = 0;
 					}
 					break;
@@ -1155,7 +1147,6 @@ int main(int argc, char ** argv)
 					keysym = XkbKeycodeToKeysym(display, ek->keycode, 0, 0);
 					if (keysym == XK_Escape)
 					{
-						XDestroyWindow(display, window);
 						running = 0;
 					}
 					else if (keysym == XK_Tab)
@@ -1208,6 +1199,9 @@ int main(int argc, char ** argv)
 			}
 		}
 	}
+	
+	XDestroyWindow(display, window);
+	XCloseDisplay(display);
 	
 	emulator_shutdown(emu);
 	free(emu);
