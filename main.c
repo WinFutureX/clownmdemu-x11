@@ -1127,7 +1127,6 @@ int main(int argc, char ** argv)
 		
 		while (XPending(display) > 0)
 		{
-			XDestroyWindowEvent * ed;
 			XClientMessageEvent * ec;
 			XKeyPressedEvent * ek;
 			int keysym;
