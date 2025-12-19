@@ -1165,7 +1165,7 @@ int main(int argc, char ** argv)
 			}
 		}
 		
-		XClearWindow(display, window);
+		memset(emu->framebuffer, 0, VDP_MAX_SCANLINE_WIDTH * VDP_MAX_SCANLINES * sizeof(uint32_t));
 		
 		emulator_iterate(emu);
 		
