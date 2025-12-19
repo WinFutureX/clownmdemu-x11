@@ -36,7 +36,6 @@
 #include <unistd.h>
 #include <libgen.h>
 #include <sys/stat.h>
-#include <arpa/inet.h>
 
 /* CLOCK_MONOTONIC_RAW is linux-only */
 #ifndef CLOCK_MONOTONIC_RAW
