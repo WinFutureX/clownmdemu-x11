@@ -90,7 +90,6 @@ char exe_dir[PATH_MAX];
 typedef struct emulator
 {
 	ClownMDEmu_Configuration configuration;
-	/*ClownMDEmu_Constant constant;*/
 	ClownMDEmu_State state;
 	ClownMDEmu_Callbacks callbacks;
 	ClownMDEmu clownmdemu;
