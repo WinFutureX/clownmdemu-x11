@@ -66,6 +66,7 @@
 
 #define BILLION 1000000000L
 #define ROM_SIZE_MAX 0x800000
+#define FRAMEBUFFER_SIZE VDP_MAX_SCANLINE_WIDTH * VDP_MAX_SCANLINES * sizeof(uint32_t)
 
 enum
 {
@@ -108,7 +109,7 @@ typedef struct emulator
 	int width;
 	int height;
 	uint32_t colors[VDP_TOTAL_COLOURS];
-	uint32_t framebuffer[VDP_MAX_SCANLINE_WIDTH * VDP_MAX_SCANLINES];
+	uint32_t * framebuffer;
 	cc_bool buttons[2][CLOWNMDEMU_BUTTON_MAX];
 	cc_u16l * rom_buf;
 	char rom_regions[4]; /* includes '\0' at end */
@@ -1033,6 +1034,13 @@ int main(int argc, char ** argv)
 		return 1;
 	}
 	
+	emu->framebuffer = malloc(FRAMEBUFFER_SIZE);
+	if (!emu->framebuffer)
+	{
+		printf("unable to alloc internal framebuffer\n");
+		return 1;
+	}
+	
 	/* init window */
 	bit_depth = 24;
 	attr_mask = CWBackPixel | CWColormap | CWEventMask;
@@ -1185,7 +1193,7 @@ int main(int argc, char ** argv)
 			}
 		}
 		
-		memset(emu->framebuffer, 0, VDP_MAX_SCANLINE_WIDTH * VDP_MAX_SCANLINES * sizeof(uint32_t));
+		memset(emu->framebuffer, 0, FRAMEBUFFER_SIZE);
 		
 		emulator_iterate(emu);
 		
