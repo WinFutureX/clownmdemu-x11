@@ -107,10 +107,10 @@ typedef struct emulator
 	int rom_size;
 	int width;
 	int height;
-	uint8_t rom[ROM_SIZE_MAX];
 	uint32_t colors[VDP_TOTAL_COLOURS];
 	uint32_t framebuffer[VDP_MAX_SCANLINE_WIDTH * VDP_MAX_SCANLINES];
 	cc_bool buttons[2][CLOWNMDEMU_BUTTON_MAX];
+	cc_u16l * rom_buf;
 	char rom_regions[4]; /* includes '\0' at end */
 	cc_bool log_enabled;
 	
@@ -707,24 +707,22 @@ void emulator_iterate(emulator * emu)
 int emulator_load_file(emulator * emu, const char * filename)
 {
 	int i;
-	int ret;
 	int size;
+	int alloc_size;
 	FILE * f;
 	struct stat buf;
-	cc_u16l * conv_ptr;
-	
-	ret = 0;
+	cc_u16l * tmp;
 	
 	if (stat(filename, &buf) != 0)
 	{
 		printf("stat failed\n");
-		return ret;
+		return 0;
 	}
 	
 	if (!S_ISREG(buf.st_mode))
 	{
 		printf("not a file\n");
-		return ret;
+		return 0;
 	}
 	
 	CDReader_Open(&emu->cd, NULL, filename, &emu->cd_callbacks);
@@ -736,11 +734,12 @@ int emulator_load_file(emulator * emu, const char * filename)
 		{
 			printf("cd sector seek failed\n");
 			CDReader_Close(&emu->cd);
+			return 0;
 		}
 		else
 		{
 			printf("booting cd\n");
-			ret = 1;
+			return 1;
 		}
 	}
 	else
@@ -750,66 +749,82 @@ int emulator_load_file(emulator * emu, const char * filename)
 		if (!f)
 		{
 			perror("unable to open file");
+			return 0;
+		}
+		if (fseek(f, 0, SEEK_END) != 0)
+		{
+			printf("unable to seek to end of file\n");
+			fclose(f);
+			return 0;
+		}
+		size = ftell(f);
+		if (size > ROM_SIZE_MAX || size < 1)
+		{
+			printf("size out of bounds\n");
+			fclose(f);
+			return 0;
+		}
+		if (size % 2 == 1)
+		{
+			alloc_size = size + 1;
 		}
 		else
 		{
-			if (fseek(f, 0, SEEK_END) != 0)
+			alloc_size = size;
+		}
+		tmp = malloc(alloc_size);
+		if (!tmp)
+		{
+			printf("unable to allocate rom buffer");
+			fclose(f);
+			return 0;
+		}
+		if (fseek(f, 0, SEEK_SET) != 0)
+		{
+			printf("unable to seek to start of file\n");
+			fclose(f);
+			return 0;
+		}
+		if (fread(tmp, 1, size, f) != size)
+		{
+			/* error handling */
+			if (feof(f))
 			{
-				printf("unable to seek to end of file\n");
-				return ret;
+				printf("unexpected EOF\n");
 			}
-			size = ftell(f);
-			if (size > ROM_SIZE_MAX || size < 1)
+			else if (ferror(f))
 			{
-				printf("size out of bounds\n");
+				printf("unable to read file\n");
 			}
 			else
 			{
-				if (fseek(f, 0, SEEK_SET) != 0)
-				{
-					printf("unable to seek to start of file\n");
-					return ret;
-				}
-				if (fread(emu->rom, sizeof(emu->rom[0]), size, f) != size)
-				{
-					/* error handling */
-					if (feof(f))
-					{
-						printf("unexpected EOF\n");
-					}
-					else if (ferror(f))
-					{
-						printf("unable to read file\n");
-					}
-					else
-					{
-						printf("unknown read error\n");
-					}
-				}
-				else
-				{
-					emu->rom_size = size;
-					memset(emu->rom_regions, 0, sizeof(emu->rom_regions));
-					if (emu->rom_size >= 0x1F3)
-					{
-						memcpy(emu->rom_regions, &emu->rom[0x1F0], 3);
-					}
-					/* on little endian systems, byteswap the rom so the emulator core can read it */
-					conv_ptr = (cc_u16l *) emu->rom;
-					for (i = 0; i < size / sizeof(cc_u16l); i++)
-					{
-						conv_ptr[i] = htons(conv_ptr[i]);
-					}
-					ClownMDEmu_SetCartridge(&emu->clownmdemu, (cc_u16l *) emu->rom, emu->rom_size);
-					printf("booting cartridge, loaded %d bytes\n", size);
-					ret = 1;
-				}
+				printf("unknown read error\n");
 			}
 			fclose(f);
+			return 0;
 		}
+		emu->rom_size = size;
+		memset(emu->rom_regions, 0, sizeof(emu->rom_regions));
+		if (emu->rom_size >= 0x1F3)
+		{
+			memcpy(emu->rom_regions, &tmp[0x1F0 / sizeof(cc_u16l)], 3);
+		}
+		/* byteswap the rom so the emulator core can read it */
+		for (i = 0; i < alloc_size / sizeof(cc_u16l); i++)
+		{
+			tmp[i] = ((tmp[i] & 0xFF) << 8) | ((tmp[i] & 0xFF00) >> 8); 
+		}
+		if (emu->rom_buf)
+		{
+			free(emu->rom_buf);
+		}
+		emu->rom_buf = tmp;
+		ClownMDEmu_SetCartridge(&emu->clownmdemu, emu->rom_buf, emu->rom_size);
+		printf("booting cartridge, loaded %d bytes\n", size);
+		fclose(f);
 	}
 	
-	return ret;
+	return 1;
 }
 
 void emulator_key(emulator * emu, int keysym, cc_bool down)
