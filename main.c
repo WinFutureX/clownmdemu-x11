@@ -878,6 +878,11 @@ void emulator_shutdown(emulator * emu)
 		Mixer_Deinitialise(&emu->mixer);
 		emu->audio_init = cc_false;
 	}
+	if (emu->rom_buf)
+	{
+		free(emu->rom_buf);
+		emu->rom_buf = NULL;
+	}
 }
 
 /* init and main loop */
