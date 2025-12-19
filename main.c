@@ -91,7 +91,7 @@ char exe_dir[PATH_MAX];
 typedef struct emulator
 {
 	ClownMDEmu_Configuration configuration;
-	ClownMDEmu_Constant constant;
+	/*ClownMDEmu_Constant constant;*/
 	ClownMDEmu_State state;
 	ClownMDEmu_Callbacks callbacks;
 	ClownMDEmu clownmdemu;
@@ -568,7 +568,7 @@ void emulator_callback_mixer_complete(void * const data, const cc_s16l * samples
 /* emulator misc */
 void emulator_init(emulator * emu)
 {
-	ClownMDEmu_Parameters_Initialise(&emu->clownmdemu, &emu->configuration, &emu->constant, &emu->state, &emu->callbacks);
+	ClownMDEmu_Parameters_Initialise(&emu->clownmdemu, &emu->configuration, &emu->state, &emu->callbacks);
 	
 	emu->callbacks.user_data = emu;
 	emu->callbacks.colour_updated = emulator_callback_color_update;
@@ -600,7 +600,7 @@ void emulator_init(emulator * emu)
 	ClownCD_SetErrorCallback(emulator_callback_clowncd_log, emu);
 	ClownMDEmu_SetLogCallback(emulator_callback_log, emu);
 	
-	ClownMDEmu_Constant_Initialise(&emu->constant);
+	ClownMDEmu_Constant_Initialise();
 	ClownMDEmu_State_Initialise(&emu->state);
 	CDReader_Initialise(&emu->cd);
 }
@@ -682,7 +682,7 @@ void emulator_set_options(emulator * emu, cc_bool log_enabled, cc_bool widescree
 
 void emulator_reset(emulator * emu)
 {
-	ClownMDEmu_Reset(&emu->clownmdemu, emu->cd_boot);
+	ClownMDEmu_Reset(&emu->clownmdemu, !emu->cd_boot, emu->cd_boot);
 	/*printf("sram: size %d nv %d data_size %d type %d map_in %d\n",
 		emu->state.external_ram.size,
 		emu->state.external_ram.non_volatile,
@@ -1229,6 +1229,7 @@ int main(int argc, char ** argv)
 	}
 	
 	XDestroyWindow(display, window);
+	XDestroyImage(x_window_buffer);
 	XCloseDisplay(display);
 	
 	emulator_shutdown(emu);
