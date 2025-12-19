@@ -234,7 +234,7 @@ char * build_file_path(const char * path, const char * filename)
 		return NULL;
 	}
 	ret_size = PATH_MAX * sizeof(char);
-	ret = malloc(ret_size);
+	ret = (char *) malloc(ret_size);
 	if (!ret)
 	{
 		return NULL;
@@ -503,7 +503,7 @@ size_t emulator_callback_clowncd_write(const void * const buf, const size_t size
 		return 0;
 	}
 	
-	bytes = fwrite(buf, size, count, stream);
+	bytes = fwrite(buf, size, count, (FILE *) stream);
 	if (bytes < 0 || (uint64_t) bytes > (size_t) -1)
 	{
 		return 0;
@@ -773,7 +773,7 @@ int emulator_load_file(emulator * emu, const char * filename)
 		{
 			alloc_size = size;
 		}
-		tmp = malloc(alloc_size);
+		tmp = (cc_u16l *) malloc(alloc_size);
 		if (!tmp)
 		{
 			printf("unable to allocate rom buffer");
@@ -1034,7 +1034,7 @@ int main(int argc, char ** argv)
 		return 1;
 	}
 	
-	emu->framebuffer = malloc(FRAMEBUFFER_SIZE);
+	emu->framebuffer = (uint32_t *) malloc(FRAMEBUFFER_SIZE);
 	if (!emu->framebuffer)
 	{
 		printf("unable to alloc internal framebuffer\n");
@@ -1202,6 +1202,7 @@ int main(int argc, char ** argv)
 			x_window_buffer->width = emu->width;
 			x_window_buffer->height = emu->height;
 			x_window_buffer->bytes_per_line = emu->width * 4;
+			XClearWindow(display, window);
 			XPutImage(display, window, default_gc, x_window_buffer, 0, 0, (width - emu->width) / 2, (height - emu->height) / 2, width, height);
 		}
 		
