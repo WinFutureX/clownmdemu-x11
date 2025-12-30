@@ -1053,7 +1053,7 @@ int main(int argc, char ** argv)
 		warn("unable to get executable directory, saves will not be available!\n");
 	}
 	
-	width = widescreen_enabled == cc_true ? VDP_MAX_SCANLINE_WIDTH - (VDP_TILE_PAIR_COUNT * VDP_TILE_WIDTH) : VDP_H40_SCREEN_WIDTH_IN_TILE_PAIRS * VDP_TILE_PAIR_WIDTH;
+	width = widescreen_enabled == cc_true ? VDP_MAX_SCANLINE_WIDTH : VDP_H40_SCREEN_WIDTH_IN_TILE_PAIRS * VDP_TILE_PAIR_WIDTH;
 	height = VDP_MAX_SCANLINES;
 	
 	emu = (emulator *) malloc(sizeof(emulator));
