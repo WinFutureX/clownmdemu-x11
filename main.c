@@ -255,7 +255,7 @@ void strip_ext(char * filename)
 		return;
 	}
 	end = filename + strlen(filename);
-	while (end > filename && *end != '.' && *end != '\\' && !end != '/')
+	while (end > filename && *end != '.' && *end != '\\' && *end != '/')
 	{
 		--end;
 	}
@@ -280,7 +280,7 @@ void emulator_callback_color_update(void * data, cc_u16f idx, cc_u16f color)
 void emulator_callback_scanline_render(void * data, cc_u16f scanline, const cc_u8l * pixels, cc_u16f left_boundary, cc_u16f right_boundary, cc_u16f width, cc_u16f height)
 {
 	emulator * e = (emulator *) data;
-	int i;
+	cc_u16f i;
 	const cc_u8l * input;
 	uint32_t * output;
 	e->width = width;
@@ -324,19 +324,19 @@ void emulator_callback_cdda_generate(void * data, struct ClownMDEmu * clownmdemu
 	generate_cdda_audio(clownmdemu, Mixer_AllocateCDDASamples(&e->mixer, frames), frames);
 }
 
-void emulator_callback_cd_seek(void * const data, cc_u32f idx)
+void emulator_callback_cd_seek(void * data, cc_u32f idx)
 {
 	emulator * e = (emulator *) data;
 	CDReader_SeekToSector(&e->cd, idx);
 }
 
-void emulator_callback_cd_sector_read(void * const data, cc_u16l * const buf)
+void emulator_callback_cd_sector_read(void * data, cc_u16l * buf)
 {
 	emulator * e = (emulator *) data;
 	CDReader_ReadSector(&e->cd, buf);
 }
 
-cc_bool emulator_callback_cd_seek_track(void * const data, const cc_u16f idx, const ClownMDEmu_CDDAMode mode)
+cc_bool emulator_callback_cd_seek_track(void * data, cc_u16f idx, ClownMDEmu_CDDAMode mode)
 {
 	emulator * e = (emulator *) data;
 	CDReader_PlaybackSetting playback_setting;
@@ -360,13 +360,13 @@ cc_bool emulator_callback_cd_seek_track(void * const data, const cc_u16f idx, co
 	return CDReader_PlayAudio(&e->cd, idx, playback_setting);
 }
 
-size_t emulator_callback_cd_audio_read(void * const data, cc_s16l * const buf, const size_t frames)
+size_t emulator_callback_cd_audio_read(void * data, cc_s16l * buf, size_t frames)
 {
 	emulator * e = (emulator *) data;
 	return CDReader_ReadAudio(&e->cd, buf, frames);
 }
 
-cc_bool emulator_callback_save_file_open_read(void * const data, const char * const filename)
+cc_bool emulator_callback_save_file_open_read(void * data, const char * filename)
 {
 	emulator * e = (emulator *) data;
 	char * file_path = build_file_path(exe_dir, filename);
@@ -379,7 +379,7 @@ cc_bool emulator_callback_save_file_open_read(void * const data, const char * co
 	return e->bram ? cc_true : cc_false;
 }
 
-cc_s16f emulator_callback_save_file_read(void * const data)
+cc_s16f emulator_callback_save_file_read(void * data)
 {
 	emulator * e = (emulator *) data;
 	uint8_t byte;
@@ -393,7 +393,7 @@ cc_s16f emulator_callback_save_file_read(void * const data)
 	}
 }
 
-cc_bool emulator_callback_save_file_open_write(void * const data, const char * const filename)
+cc_bool emulator_callback_save_file_open_write(void * data, const char * filename)
 {
 	emulator * e = (emulator *) data;
 	char * file_path = build_file_path(exe_dir, filename);
@@ -406,7 +406,7 @@ cc_bool emulator_callback_save_file_open_write(void * const data, const char * c
 	return e->bram ? cc_true : cc_false;
 }
 
-void emulator_callback_save_file_write(void * const data, const cc_u8f val)
+void emulator_callback_save_file_write(void * data, cc_u8f val)
 {
 	emulator * e = (emulator *) data;
 	if (e->bram)
@@ -415,7 +415,7 @@ void emulator_callback_save_file_write(void * const data, const cc_u8f val)
 	}
 }
 
-void emulator_callback_save_file_close(void * const data)
+void emulator_callback_save_file_close(void * data)
 {
 	emulator * e = (emulator *) data;
 	if (e->bram)
@@ -424,10 +424,11 @@ void emulator_callback_save_file_close(void * const data)
 	}
 }
 
-cc_bool emulator_callback_save_file_remove(void * const data, const char * const filename)
+cc_bool emulator_callback_save_file_remove(void * data, const char * filename)
 {
 	int status;
 	char * file_path = build_file_path(exe_dir, filename);
+	(void) data;
 	if (!file_path)
 	{
 		return cc_false;
@@ -437,7 +438,7 @@ cc_bool emulator_callback_save_file_remove(void * const data, const char * const
 	return status == 0 ? cc_true : cc_false;
 }
 
-cc_bool emulator_callback_save_file_size_obtain(void * const data, const char * const filename, size_t * const size)
+cc_bool emulator_callback_save_file_size_obtain(void * data, const char * filename, size_t * size)
 {
 	emulator * e = (emulator *) data;
 	int file_size = 0;
@@ -461,7 +462,7 @@ cc_bool emulator_callback_save_file_size_obtain(void * const data, const char * 
 	return file_size > 0 ? cc_true : cc_false;
 }
 
-void emulator_callback_log(void * const data, const char * fmt, va_list args)
+void emulator_callback_log(void * data, const char * fmt, va_list args)
 {
 	emulator * e = (emulator *) data;
 	if (e->log_enabled == cc_true)
@@ -488,12 +489,12 @@ void * emulator_callback_clowncd_open(const char * filename, ClownCD_FileMode mo
 	return fopen(filename, open_mode);
 }
 
-int emulator_callback_clowncd_close(void * const stream)
+int emulator_callback_clowncd_close(void * stream)
 {
 	return fclose((FILE *) stream);
 }
 
-size_t emulator_callback_clowncd_read(void * const buf, const size_t size, const size_t count, void * const stream)
+size_t emulator_callback_clowncd_read(void * buf, size_t size, size_t count, void * stream)
 {
 	int64_t bytes;
 	if (size == 0 || count == 0)
@@ -510,7 +511,7 @@ size_t emulator_callback_clowncd_read(void * const buf, const size_t size, const
 	return bytes;
 }
 
-size_t emulator_callback_clowncd_write(const void * const buf, const size_t size, const size_t count, void * const stream)
+size_t emulator_callback_clowncd_write(const void * buf, size_t size, size_t count, void * stream)
 {
 	int64_t bytes;
 	if (size == 0 || count == 0)
@@ -527,7 +528,7 @@ size_t emulator_callback_clowncd_write(const void * const buf, const size_t size
 	return bytes;
 }
 
-long emulator_callback_clowncd_tell(void * const stream)
+long emulator_callback_clowncd_tell(void * stream)
 {
 	const int64_t pos = ftell((FILE *) stream);
 	if (pos < 0 || pos > LONG_MAX)
@@ -538,7 +539,7 @@ long emulator_callback_clowncd_tell(void * const stream)
 	return pos;
 }
 
-int emulator_callback_clowncd_seek(void * const stream, const long pos, const ClownCD_FileOrigin origin)
+int emulator_callback_clowncd_seek(void * stream, long pos, ClownCD_FileOrigin origin)
 {
 	int seek_origin;
 	switch (origin)
@@ -559,7 +560,7 @@ int emulator_callback_clowncd_seek(void * const stream, const long pos, const Cl
 	return fseek((FILE *) stream, pos, seek_origin) != 0 ? -1 : 0;
 }
 
-void emulator_callback_clowncd_log(void * const data, const char * const msg)
+void emulator_callback_clowncd_log(void * data, const char * msg)
 {
 	emulator * e = (emulator *) data;
 	if (e->log_enabled == cc_true)
@@ -568,7 +569,7 @@ void emulator_callback_clowncd_log(void * const data, const char * const msg)
 	}
 }
 
-void emulator_callback_mixer_complete(void * const data, const cc_s16l * samples, const size_t frames)
+void emulator_callback_mixer_complete(void * data, const cc_s16l * samples, size_t frames)
 {
 	emulator * e = (emulator *) data;
 	size_t bytes = frames * sizeof(cc_s16l) * MIXER_CHANNEL_COUNT;
@@ -717,9 +718,9 @@ void emulator_iterate(emulator * emu)
 
 int emulator_load_file(emulator * emu, const char * filename)
 {
-	int i;
-	int size;
-	int alloc_size;
+	unsigned int i;
+	size_t size;
+	size_t alloc_size;
 	FILE * f;
 	struct stat buf;
 	cc_u16l * tmp;
@@ -736,11 +737,11 @@ int emulator_load_file(emulator * emu, const char * filename)
 		printf("unable to resolve filename path\n");
 		goto exit_only;
 	}
-	printf("realpath %s len %d\n", path, strlen(path));
+	printf("realpath %s len %ld\n", path, strlen(path));
 	base = strdup(basename(path));
-	printf("basename %s len %d\n", base, strlen(base));
+	printf("basename %s len %ld\n", base, strlen(base));
 	strip_ext(base);
-	printf("strip_ext %s len %d\n", base, strlen(base));
+	printf("strip_ext %s len %ld\n", base, strlen(base));
 	free(base);
 	
 	if (stat(filename, &buf) != 0)
@@ -846,7 +847,7 @@ int emulator_load_file(emulator * emu, const char * filename)
 		}
 		emu->rom_buf = tmp;
 		ClownMDEmu_SetCartridge(&emu->clownmdemu, emu->rom_buf, emu->rom_size);
-		printf("booting cartridge, loaded %d bytes\n", size);
+		printf("booting cartridge, loaded %ld bytes\n", size);
 		ret = 1;
 	}
 exit_close_file:
