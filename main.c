@@ -484,9 +484,12 @@ void * emulator_callback_clowncd_open(const char * filename, ClownCD_FileMode mo
 		case CLOWNCD_WB:
 			open_mode = "wb";
 			break;
+		default:
+			open_mode = NULL;
+			break;
 	}
 	
-	return fopen(filename, open_mode);
+	return open_mode ? fopen(filename, open_mode) : NULL;
 }
 
 int emulator_callback_clowncd_close(void * stream)
