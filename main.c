@@ -76,10 +76,6 @@ enum
 };
 
 /* path stuff */
-char save_pwd[PATH_MAX];
-char save_argv0[PATH_MAX];
-char save_path[PATH_MAX];
-
 const char path_sep = '/';
 const char path_sep_str[2] = "/";
 const char path_list_sep[8] = ":"; /* could be ":;" */
@@ -89,7 +85,7 @@ char exe_dir[PATH_MAX];
 /* emulator stuff */
 typedef struct emulator
 {
-	ClownMDEmu_Configuration configuration;
+	ClownMDEmu_InitialConfiguration initial_configuration;
 	ClownMDEmu_State state;
 	ClownMDEmu_Callbacks callbacks;
 	ClownMDEmu clownmdemu;
@@ -141,6 +137,9 @@ void usage(const char * app_name)
 
 int exe_dir_init(char * argv0, char * result, size_t result_size)
 {
+	char save_pwd[PATH_MAX];
+	char save_argv0[PATH_MAX];
+	char save_path[PATH_MAX];
 	char new_path[PATH_MAX];
 	char new_path_2[PATH_MAX];
 	char * dir_tmp;
@@ -248,8 +247,26 @@ char * build_file_path(const char * path, const char * filename)
 	return ret;
 }
 
+void strip_ext(char * filename)
+{
+	char * end;
+	if (!filename)
+	{
+		return;
+	}
+	end = filename + strlen(filename);
+	while (end > filename && *end != '.' && *end != '\\' && !end != '/')
+	{
+		--end;
+	}
+	if ((end > filename && *end == '.') && (*(end - 1) != '\\' && *(end - 1) != '/'))
+	{
+		*end = '\0';
+	}
+}
+
 /* emulator callbacks */
-void emulator_callback_color_update(void * const data, const cc_u16f idx, const cc_u16f color)
+void emulator_callback_color_update(void * data, cc_u16f idx, cc_u16f color)
 {
 	emulator * e = (emulator *) data;
 	const cc_u32f r = color & 0xF;
@@ -260,7 +277,7 @@ void emulator_callback_color_update(void * const data, const cc_u16f idx, const 
 	e->colors[idx] = 0xFF000000 | (r << 20) | (r << 16) | (g << 12) | (g << 8) | (b << 4) | b;
 }
 
-void emulator_callback_scanline_render(void * const data, const cc_u16f scanline, const cc_u8l * const pixels, const cc_u16f left_boundary, const cc_u16f right_boundary, const cc_u16f width, const cc_u16f height)
+void emulator_callback_scanline_render(void * data, cc_u16f scanline, const cc_u8l * pixels, cc_u16f left_boundary, cc_u16f right_boundary, cc_u16f width, cc_u16f height)
 {
 	emulator * e = (emulator *) data;
 	int i;
@@ -277,31 +294,31 @@ void emulator_callback_scanline_render(void * const data, const cc_u16f scanline
 	}
 }
 
-cc_bool emulator_callback_input_request(void * const data, const cc_u8f player, const ClownMDEmu_Button button)
+cc_bool emulator_callback_input_request(void * data, cc_u8f player, ClownMDEmu_Button button)
 {
 	emulator * e = (emulator *) data;
 	return e->buttons[player][button];
 }
 
-void emulator_callback_fm_generate(void * const data, const struct ClownMDEmu * clownmdemu, size_t frames, void (* generate_fm_audio)(const struct ClownMDEmu * clownmdemu, cc_s16l * sample_buffer, size_t total_frames))
+void emulator_callback_fm_generate(void * data, struct ClownMDEmu * clownmdemu, size_t frames, void (* generate_fm_audio)(struct ClownMDEmu * clownmdemu, cc_s16l * sample_buffer, size_t total_frames))
 {
 	emulator * e = (emulator *) data;
 	generate_fm_audio(clownmdemu, Mixer_AllocateFMSamples(&e->mixer, frames), frames);
 }
 
-void emulator_callback_psg_generate(void * const data, const struct ClownMDEmu * clownmdemu, size_t frames, void (* generate_psg_audio)(const struct ClownMDEmu * clownmdemu, cc_s16l * sample_buffer, size_t total_samples))
+void emulator_callback_psg_generate(void * data, struct ClownMDEmu * clownmdemu, size_t frames, void (* generate_psg_audio)(struct ClownMDEmu * clownmdemu, cc_s16l * sample_buffer, size_t total_samples))
 {
 	emulator * e = (emulator *) data;
 	generate_psg_audio(clownmdemu, Mixer_AllocatePSGSamples(&e->mixer, frames), frames);
 }
 
-void emulator_callback_pcm_generate(void * const data, const struct ClownMDEmu * clownmdemu, size_t frames, void (* generate_pcm_audio)(const struct ClownMDEmu * clownmdemu, cc_s16l * sample_buffer, size_t total_frames))
+void emulator_callback_pcm_generate(void * data, struct ClownMDEmu * clownmdemu, size_t frames, void (* generate_pcm_audio)(struct ClownMDEmu * clownmdemu, cc_s16l * sample_buffer, size_t total_frames))
 {
 	emulator * e = (emulator *) data;
 	generate_pcm_audio(clownmdemu, Mixer_AllocatePCMSamples(&e->mixer, frames), frames);
 }
 
-void emulator_callback_cdda_generate(void * const data, const struct ClownMDEmu * clownmdemu, size_t frames, void (* generate_cdda_audio)(const struct ClownMDEmu * clownmdemu, cc_s16l * sample_buffer, size_t total_frames))
+void emulator_callback_cdda_generate(void * data, struct ClownMDEmu * clownmdemu, size_t frames, void (* generate_cdda_audio)(struct ClownMDEmu * clownmdemu, cc_s16l * sample_buffer, size_t total_frames))
 {
 	emulator * e = (emulator *) data;
 	generate_cdda_audio(clownmdemu, Mixer_AllocateCDDASamples(&e->mixer, frames), frames);
@@ -566,8 +583,6 @@ void emulator_callback_mixer_complete(void * const data, const cc_s16l * samples
 /* emulator misc */
 void emulator_init(emulator * emu)
 {
-	ClownMDEmu_Parameters_Initialise(&emu->clownmdemu, &emu->configuration, &emu->state, &emu->callbacks);
-	
 	emu->callbacks.user_data = emu;
 	emu->callbacks.colour_updated = emulator_callback_color_update;
 	emu->callbacks.scanline_rendered = emulator_callback_scanline_render;
@@ -599,13 +614,13 @@ void emulator_init(emulator * emu)
 	ClownMDEmu_SetLogCallback(emulator_callback_log, emu);
 	
 	ClownMDEmu_Constant_Initialise();
-	ClownMDEmu_State_Initialise(&emu->state);
 	CDReader_Initialise(&emu->cd);
+	ClownMDEmu_Initialise(&emu->clownmdemu, &emu->initial_configuration, &emu->callbacks);
 }
 
 void emulator_init_audio(emulator * emu)
 {
-	cc_bool pal = emu->configuration.general.tv_standard == CLOWNMDEMU_TV_STANDARD_PAL ? cc_true : cc_false;
+	cc_bool pal = emu->clownmdemu.configuration.tv_standard == CLOWNMDEMU_TV_STANDARD_PAL ? cc_true : cc_false;
 	memset(emu->samples, 0, sizeof(emu->samples));
 	emu->audio_init = Mixer_Initialise(&emu->mixer, pal);
 	if (!emu->audio_init)
@@ -654,17 +669,17 @@ void emulator_set_region(emulator * emu, int force_region)
 	switch (detect_region)
 	{
 		case REGION_JP:
-			emu->configuration.general.region = CLOWNMDEMU_REGION_DOMESTIC;
-			emu->configuration.general.tv_standard = CLOWNMDEMU_TV_STANDARD_NTSC;
+			emu->clownmdemu.configuration.region = CLOWNMDEMU_REGION_DOMESTIC;
+			emu->clownmdemu.configuration.tv_standard = CLOWNMDEMU_TV_STANDARD_NTSC;
 			break;
 		case REGION_EU:
-			emu->configuration.general.region = CLOWNMDEMU_REGION_OVERSEAS;
-			emu->configuration.general.tv_standard = CLOWNMDEMU_TV_STANDARD_PAL;
+			emu->clownmdemu.configuration.region = CLOWNMDEMU_REGION_OVERSEAS;
+			emu->clownmdemu.configuration.tv_standard = CLOWNMDEMU_TV_STANDARD_PAL;
 			break;
 		default:
 		case REGION_US:
-			emu->configuration.general.region = CLOWNMDEMU_REGION_OVERSEAS;
-			emu->configuration.general.tv_standard = CLOWNMDEMU_TV_STANDARD_NTSC;
+			emu->clownmdemu.configuration.region = CLOWNMDEMU_REGION_OVERSEAS;
+			emu->clownmdemu.configuration.tv_standard = CLOWNMDEMU_TV_STANDARD_NTSC;
 			break;
 	}
 }
@@ -672,10 +687,7 @@ void emulator_set_region(emulator * emu, int force_region)
 void emulator_set_options(emulator * emu, cc_bool log_enabled, cc_bool widescreen_enabled)
 {
 	emu->log_enabled = log_enabled;
-	if (widescreen_enabled == cc_true)
-	{
-		emu->configuration.vdp.widescreen_enabled = cc_true;
-	}
+	emu->clownmdemu.vdp.configuration.widescreen_tile_pairs = widescreen_enabled == cc_true ? VDP_MAX_WIDESCREEN_TILE_PAIRS : 0;
 }
 
 void emulator_reset(emulator * emu)
@@ -712,16 +724,35 @@ int emulator_load_file(emulator * emu, const char * filename)
 	struct stat buf;
 	cc_u16l * tmp;
 	
+	char * path;
+	char * base;
+	int ret = 0;
+	
+	/* TODO: remove all of this path stuff once cartridge saves are implemented */
+	printf("filename %s\n", filename);
+	path = realpath(filename, NULL);
+	if (!path)
+	{
+		printf("unable to resolve filename path\n");
+		goto exit_only;
+	}
+	printf("realpath %s len %d\n", path, strlen(path));
+	base = strdup(basename(path));
+	printf("basename %s len %d\n", base, strlen(base));
+	strip_ext(base);
+	printf("strip_ext %s len %d\n", base, strlen(base));
+	free(base);
+	
 	if (stat(filename, &buf) != 0)
 	{
 		printf("stat failed\n");
-		return 0;
+		goto exit_free_path;
 	}
 	
 	if (!S_ISREG(buf.st_mode))
 	{
 		printf("not a file\n");
-		return 0;
+		goto exit_free_path;
 	}
 	
 	CDReader_Open(&emu->cd, NULL, filename, &emu->cd_callbacks);
@@ -733,12 +764,13 @@ int emulator_load_file(emulator * emu, const char * filename)
 		{
 			printf("cd sector seek failed\n");
 			CDReader_Close(&emu->cd);
-			return 0;
+			goto exit_free_path;
 		}
 		else
 		{
 			printf("booting cd\n");
-			return 1;
+			ret = 1;
+			goto exit_free_path;
 		}
 	}
 	else
@@ -748,20 +780,18 @@ int emulator_load_file(emulator * emu, const char * filename)
 		if (!f)
 		{
 			perror("unable to open file");
-			return 0;
+			goto exit_free_path;
 		}
 		if (fseek(f, 0, SEEK_END) != 0)
 		{
 			printf("unable to seek to end of file\n");
-			fclose(f);
-			return 0;
+			goto exit_close_file;
 		}
 		size = ftell(f);
 		if (size > ROM_SIZE_MAX || size < 1)
 		{
 			printf("size out of bounds\n");
-			fclose(f);
-			return 0;
+			goto exit_close_file;
 		}
 		if (size % 2 == 1)
 		{
@@ -775,14 +805,12 @@ int emulator_load_file(emulator * emu, const char * filename)
 		if (!tmp)
 		{
 			printf("unable to allocate rom buffer");
-			fclose(f);
-			return 0;
+			goto exit_close_file;
 		}
 		if (fseek(f, 0, SEEK_SET) != 0)
 		{
 			printf("unable to seek to start of file\n");
-			fclose(f);
-			return 0;
+			goto exit_close_file;
 		}
 		if (fread(tmp, 1, size, f) != size)
 		{
@@ -799,8 +827,7 @@ int emulator_load_file(emulator * emu, const char * filename)
 			{
 				printf("unknown read error\n");
 			}
-			fclose(f);
-			return 0;
+			goto exit_close_file;
 		}
 		emu->rom_size = size;
 		memset(emu->rom_regions, 0, sizeof(emu->rom_regions));
@@ -820,10 +847,14 @@ int emulator_load_file(emulator * emu, const char * filename)
 		emu->rom_buf = tmp;
 		ClownMDEmu_SetCartridge(&emu->clownmdemu, emu->rom_buf, emu->rom_size);
 		printf("booting cartridge, loaded %d bytes\n", size);
-		fclose(f);
+		ret = 1;
 	}
-	
-	return 1;
+exit_close_file:
+	fclose(f);
+exit_free_path:
+	free(path);
+exit_only:
+	return ret;
 }
 
 void emulator_key(emulator * emu, int keysym, cc_bool down)
@@ -1086,13 +1117,25 @@ int main(int argc, char ** argv)
 		printf("unable to intercept window close event\n");
 		return 1;
 	}
-
-#ifndef DISABLE_AUDIO
+	
+	/* init emu */
+	ClownMDEmu_Constant_Initialise();
+	emulator_init(emu);
+	emulator_set_options(emu, log_enabled, widescreen_enabled);
+	if (!emulator_load_file(emu, filename))
+	{
+		printf("unable to load file\n");
+		return 1;
+	}
+	emulator_set_region(emu, region);
+	emulator_init_audio(emu);
+	
+	#ifndef DISABLE_AUDIO
 	/* init audio */
 #if defined(__linux__)
 	audio_params.format = PA_SAMPLE_S16LE;
 	audio_params.channels = MIXER_CHANNEL_COUNT;
-	audio_params.rate = MIXER_OUTPUT_SAMPLE_RATE;
+	audio_params.rate = emu->clownmdemu.configuration.tv_standard == CLOWNMDEMU_TV_STANDARD_PAL ? MIXER_OUTPUT_SAMPLE_RATE_PAL : MIXER_OUTPUT_SAMPLE_RATE_NTSC;
 	audio_device = pa_simple_new(NULL, argv[0], PA_STREAM_PLAYBACK, NULL, "audio", &audio_params, NULL, NULL, &audio_error);
 	if (!audio_device)
 	{
@@ -1126,19 +1169,9 @@ int main(int argc, char ** argv)
 #endif
 #endif
 	
-	/* init emu */
-	emulator_init(emu);
-	emulator_set_options(emu, log_enabled, widescreen_enabled);
-	if (!emulator_load_file(emu, filename))
-	{
-		printf("unable to load file\n");
-		return 1;
-	}
-	emulator_set_region(emu, region);
-	emulator_init_audio(emu);
 	emulator_reset(emu);
 	
-	ns_desired = BILLION / (emu->configuration.general.tv_standard == CLOWNMDEMU_TV_STANDARD_NTSC ? 60.0f : 50.0f);
+	ns_desired = BILLION / (emu->clownmdemu.configuration.tv_standard == CLOWNMDEMU_TV_STANDARD_NTSC ? 60.0f : 50.0f);
 	running = 1;
 	/* main loop */
 	while (running)
