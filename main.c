@@ -789,14 +789,17 @@ void emulator_load_sram(emulator * emu)
 		{
 			printf("unable to seek cartridge save ram file\n");
 		}
-		size = ftell(f);
-		if (size > sizeof(emu->clownmdemu.state.external_ram.buffer))
-		{
-			printf("cartridge save ram size exceeds bounds\n");
-		}
 		else
 		{
-			fread(emu->clownmdemu.state.external_ram.buffer, sizeof(emu->clownmdemu.state.external_ram.buffer[0]), size, f);
+			size = ftell(f);
+			if (size > sizeof(emu->clownmdemu.state.external_ram.buffer))
+			{
+				printf("cartridge save ram size exceeds bounds\n");
+			}
+			else
+			{
+				fread(emu->clownmdemu.state.external_ram.buffer, sizeof(emu->clownmdemu.state.external_ram.buffer[0]), size, f);
+			}
 		}
 		fclose(f);
 	}
