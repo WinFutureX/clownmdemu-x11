@@ -832,7 +832,7 @@ void emulator_save_sram(emulator * emu)
 	}
 	else
 	{
-		printf("failed to open %s for cartridge save ram for writing\n", comb);
+		printf("failed to open %s as cartridge save ram for writing\n", comb);
 	}
 	free(path);
 	free(comb);
