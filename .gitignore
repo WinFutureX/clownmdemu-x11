@@ -1,3 +1,4 @@
 clownmdemu
 *.brm
+*.srm
 *.o
