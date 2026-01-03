@@ -844,7 +844,6 @@ int emulator_load_cartridge(emulator * emu, const char * filename)
 	size_t alloc_size;
 	cc_u16l * tmp;
 	char * file;
-	char * base;
 	f = fopen(filename, "rb");
 	if (!f)
 	{
@@ -922,8 +921,7 @@ int emulator_load_cartridge(emulator * emu, const char * filename)
 	ClownMDEmu_SetCartridge(&emu->clownmdemu, emu->rom_buf, emu->rom_size);
 	printf("booting cartridge, loaded %ld bytes\n", size);
 	file = strdup(filename);
-	base = strdup(basename(file));
-	emu->cartridge_filename = base;
+	emu->cartridge_filename = strdup(basename(file));
 	free(file);
 	fclose(f);
 	emulator_load_sram(emu);
