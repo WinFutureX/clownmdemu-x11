@@ -86,7 +86,6 @@ char exe_dir[PATH_MAX];
 typedef struct emulator
 {
 	ClownMDEmu_InitialConfiguration initial_configuration;
-	ClownMDEmu_State state;
 	ClownMDEmu_Callbacks callbacks;
 	ClownMDEmu clownmdemu;
 	
@@ -110,6 +109,7 @@ typedef struct emulator
 	cc_bool log_enabled;
 	
 	FILE * bram;
+	char * cartridge_filename;
 } emulator;
 
 /* utility functions */
@@ -247,22 +247,61 @@ char * build_file_path(const char * path, const char * filename)
 	return ret;
 }
 
-void strip_ext(char * filename)
+char * append_ext(const char * file, const char * ext)
+{
+	char * ret;
+	size_t len_ret, len_file, len_ext;
+	if (!file || !ext)
+	{
+		return NULL;
+	}
+	if (file[0] == '\0' || ext[0] == '\0')
+	{
+		return NULL;
+	}
+	len_file = strlen(file);
+	len_ext = strlen(ext);
+	len_ret = len_file + len_ext + 2; /* includes space for '.' and '\0' */
+	ret = (char *) malloc(len_ret);
+	if (!ret)
+	{
+		return NULL;
+	}
+	memcpy(ret, file, len_file);
+	ret[len_file] = '.';
+	memcpy(ret + len_file + 1, ext, len_ext);
+	ret[len_ret - 1] = '\0';
+	return ret;
+}
+
+char * strip_ext(const char * filename)
 {
 	char * end;
-	if (!filename)
+	int diff;
+	char * ret = NULL;
+	char * copy = strdup(filename);
+	if (!copy)
 	{
-		return;
+		return ret;
 	}
-	end = filename + strlen(filename);
-	while (end > filename && *end != '.' && *end != '\\' && *end != '/')
+	end = copy + strlen(copy);
+	while (end > copy && *end != '.' && *end != '\\' && *end != '/')
 	{
 		--end;
 	}
-	if ((end > filename && *end == '.') && (*(end - 1) != '\\' && *(end - 1) != '/'))
+	if ((end > copy && *end == '.') && (*(end - 1) != '\\' && *(end - 1) != '/'))
 	{
-		*end = '\0';
+		diff = (int) (end - copy);
+		/*printf("filename %p end %p diff %d\n", copy, end, diff);*/
+		ret = (char *) malloc(diff + 1);
+		if (ret)
+		{
+			memcpy(ret, copy, diff);
+			ret[diff] = '\0';
+		}
 	}
+	free(copy);
+	return ret;
 }
 
 /* emulator callbacks */
@@ -697,12 +736,12 @@ void emulator_set_options(emulator * emu, cc_bool log_enabled, cc_bool widescree
 void emulator_reset(emulator * emu)
 {
 	ClownMDEmu_Reset(&emu->clownmdemu, !emu->cd_boot, emu->cd_boot);
-	/*printf("sram: size %d nv %d data_size %d type %d map_in %d\n",
-		emu->state.external_ram.size,
-		emu->state.external_ram.non_volatile,
-		emu->state.external_ram.data_size,
-		emu->state.external_ram.device_type,
-		emu->state.external_ram.mapped_in
+	/*printf("sram: size %ld nv %d data_size %d type %d map_in %d\n",
+		emu->clownmdemu.state.external_ram.size,
+		emu->clownmdemu.state.external_ram.non_volatile,
+		emu->clownmdemu.state.external_ram.data_size,
+		emu->clownmdemu.state.external_ram.device_type,
+		emu->clownmdemu.state.external_ram.mapped_in
 	);*/
 }
 
@@ -719,146 +758,206 @@ void emulator_iterate(emulator * emu)
 	}
 }
 
-int emulator_load_file(emulator * emu, const char * filename)
+int emulator_load_cd(emulator * emu, const char * filename)
+{
+	CDReader_Open(&emu->cd, NULL, filename, &emu->cd_callbacks);
+	if (!CDReader_IsOpen(&emu->cd))
+	{
+		return 0;
+	}
+	CDReader_SeekToSector(&emu->cd, 0);
+	return 1;
+}
+
+void emulator_load_sram(emulator * emu)
+{
+	FILE * f;
+	size_t size;
+	char * path;
+	char * comb;
+	char * strip;
+	strip = strip_ext(emu->cartridge_filename);
+	comb = append_ext(strip, "srm");
+	path = build_file_path(exe_dir, comb);
+	if (path)
+	{
+		f = fopen(path, "rb");
+	}
+	if (f)
+	{
+		if (fseek(f, 0, SEEK_END) != 0)
+		{
+			printf("unable to seek cartridge save ram file\n");
+		}
+		size = ftell(f);
+		if (size > sizeof(emu->clownmdemu.state.external_ram.buffer))
+		{
+			printf("cartridge save ram size exceeds bounds\n");
+		}
+		else
+		{
+			fread(emu->clownmdemu.state.external_ram.buffer, sizeof(emu->clownmdemu.state.external_ram.buffer[0]), size, f);
+		}
+		fclose(f);
+	}
+	free(path);
+	free(comb);
+	free(strip);
+}
+
+void emulator_save_sram(emulator * emu)
+{
+	FILE * f;
+	char * path;
+	char * comb;
+	char * strip;
+	if (emu->clownmdemu.state.external_ram.non_volatile == cc_false || emu->clownmdemu.state.external_ram.size == 0)
+	{
+		return;
+	}
+	strip = strip_ext(emu->cartridge_filename);
+	comb = append_ext(strip, "srm");
+	path = build_file_path(exe_dir, comb);
+	if (path)
+	{
+		f = fopen(path, "w+b");
+	}
+	if (f)
+	{
+		fwrite(emu->clownmdemu.state.external_ram.buffer, sizeof(emu->clownmdemu.state.external_ram.buffer[0]), emu->clownmdemu.state.external_ram.size, f);
+		fclose(f);
+	}
+	else
+	{
+		printf("failed to open %s for cartridge save ram for writing\n", comb);
+	}
+	free(path);
+	free(comb);
+	free(strip);
+}
+
+int emulator_load_cartridge(emulator * emu, const char * filename)
 {
 	unsigned int i;
+	FILE * f;
 	size_t size;
 	size_t alloc_size;
-	FILE * f;
-	struct stat buf;
 	cc_u16l * tmp;
-	
-	char * path;
+	char * file;
 	char * base;
-	int ret = 0;
-	
-	/* TODO: remove all of this path stuff once cartridge saves are implemented */
-	printf("filename %s\n", filename);
-	path = realpath(filename, NULL);
-	if (!path)
+	f = fopen(filename, "rb");
+	if (!f)
 	{
-		printf("unable to resolve filename path\n");
-		goto exit_only;
+		perror("unable to open file");
+		return 0;
 	}
-	printf("realpath %s len %ld\n", path, strlen(path));
-	base = strdup(basename(path));
-	printf("basename %s len %ld\n", base, strlen(base));
-	strip_ext(base);
-	printf("strip_ext %s len %ld\n", base, strlen(base));
-	free(base);
+	if (fseek(f, 0, SEEK_END) != 0)
+	{
+		printf("unable to seek to end of file\n");
+		fclose(f);
+		return 0;
+	}
+	size = ftell(f);
+	if (size > ROM_SIZE_MAX || size < 1)
+	{
+		printf("size out of bounds\n");
+		fclose(f);
+		return 0;
+	}
+	if (size % 2 == 1)
+	{
+		alloc_size = size + 1;
+	}
+	else
+	{
+		alloc_size = size;
+	}
+	tmp = (cc_u16l *) malloc(alloc_size);
+	if (!tmp)
+	{
+		printf("unable to allocate rom buffer");
+		fclose(f);
+		return 0;
+	}
+	if (fseek(f, 0, SEEK_SET) != 0)
+	{
+		printf("unable to seek to start of file\n");
+		fclose(f);
+		return 0;
+	}
+	if (fread(tmp, 1, size, f) != size)
+	{
+		/* error handling */
+		if (feof(f))
+		{
+			printf("unexpected EOF\n");
+		}
+		else if (ferror(f))
+		{
+			printf("unable to read file\n");
+		}
+		else
+		{
+			printf("unknown read error\n");
+		}
+		fclose(f);
+		return 0;
+	}
+	emu->rom_size = size;
+	memset(emu->rom_regions, 0, sizeof(emu->rom_regions));
+	if (emu->rom_size >= 0x1F3)
+	{
+		memcpy(emu->rom_regions, &tmp[0x1F0 / sizeof(cc_u16l)], 3);
+	}
+	/* byteswap the rom so the emulator core can read it */
+	for (i = 0; i < alloc_size / sizeof(cc_u16l); i++)
+	{
+		tmp[i] = ((tmp[i] & 0xFF) << 8) | ((tmp[i] & 0xFF00) >> 8); 
+	}
+	if (emu->rom_buf)
+	{
+		free(emu->rom_buf);
+	}
+	emu->rom_buf = tmp;
+	ClownMDEmu_SetCartridge(&emu->clownmdemu, emu->rom_buf, emu->rom_size);
+	printf("booting cartridge, loaded %ld bytes\n", size);
+	file = strdup(filename);
+	base = strdup(basename(file));
+	emu->cartridge_filename = base;
+	free(file);
+	fclose(f);
+	emulator_load_sram(emu);
+	return 1;
+}
+
+int emulator_load_file(emulator * emu, const char * filename)
+{
+	struct stat buf;
 	
 	if (stat(filename, &buf) != 0)
 	{
 		printf("stat failed\n");
-		goto exit_free_path;
+		return 0;
 	}
 	
 	if (!S_ISREG(buf.st_mode))
 	{
 		printf("not a file\n");
-		goto exit_free_path;
+		return 0;
 	}
 	
-	CDReader_Open(&emu->cd, NULL, filename, &emu->cd_callbacks);
-	emu->cd_boot = CDReader_IsMegaCDGame(&emu->cd);
-	
-	if (emu->cd_boot)
+	if (emulator_load_cd(emu, filename))
 	{
-		if (!CDReader_SeekToSector(&emu->cd, 0))
+		if (CDReader_IsMegaCDGame(&emu->cd))
 		{
-			printf("cd sector seek failed\n");
-			CDReader_Close(&emu->cd);
-			goto exit_free_path;
-		}
-		else
-		{
+			emu->cd_boot = cc_true;
 			printf("booting cd\n");
-			ret = 1;
-			goto exit_free_path;
+			return 1;
 		}
-	}
-	else
-	{
 		CDReader_Close(&emu->cd);
-		f = fopen(filename, "rb");
-		if (!f)
-		{
-			perror("unable to open file");
-			goto exit_free_path;
-		}
-		if (fseek(f, 0, SEEK_END) != 0)
-		{
-			printf("unable to seek to end of file\n");
-			goto exit_close_file;
-		}
-		size = ftell(f);
-		if (size > ROM_SIZE_MAX || size < 1)
-		{
-			printf("size out of bounds\n");
-			goto exit_close_file;
-		}
-		if (size % 2 == 1)
-		{
-			alloc_size = size + 1;
-		}
-		else
-		{
-			alloc_size = size;
-		}
-		tmp = (cc_u16l *) malloc(alloc_size);
-		if (!tmp)
-		{
-			printf("unable to allocate rom buffer");
-			goto exit_close_file;
-		}
-		if (fseek(f, 0, SEEK_SET) != 0)
-		{
-			printf("unable to seek to start of file\n");
-			goto exit_close_file;
-		}
-		if (fread(tmp, 1, size, f) != size)
-		{
-			/* error handling */
-			if (feof(f))
-			{
-				printf("unexpected EOF\n");
-			}
-			else if (ferror(f))
-			{
-				printf("unable to read file\n");
-			}
-			else
-			{
-				printf("unknown read error\n");
-			}
-			goto exit_close_file;
-		}
-		emu->rom_size = size;
-		memset(emu->rom_regions, 0, sizeof(emu->rom_regions));
-		if (emu->rom_size >= 0x1F3)
-		{
-			memcpy(emu->rom_regions, &tmp[0x1F0 / sizeof(cc_u16l)], 3);
-		}
-		/* byteswap the rom so the emulator core can read it */
-		for (i = 0; i < alloc_size / sizeof(cc_u16l); i++)
-		{
-			tmp[i] = ((tmp[i] & 0xFF) << 8) | ((tmp[i] & 0xFF00) >> 8); 
-		}
-		if (emu->rom_buf)
-		{
-			free(emu->rom_buf);
-		}
-		emu->rom_buf = tmp;
-		ClownMDEmu_SetCartridge(&emu->clownmdemu, emu->rom_buf, emu->rom_size);
-		printf("booting cartridge, loaded %ld bytes\n", size);
-		ret = 1;
+		emu->cd_boot = cc_false;
 	}
-exit_close_file:
-	fclose(f);
-exit_free_path:
-	free(path);
-exit_only:
-	return ret;
+	return emulator_load_cartridge(emu, filename);
 }
 
 void emulator_key(emulator * emu, int keysym, cc_bool down)
@@ -904,6 +1003,21 @@ void emulator_key(emulator * emu, int keysym, cc_bool down)
 	}
 }
 
+void emulator_unload_cartridge(emulator * emu)
+{
+	if (emu->rom_buf)
+	{
+		free(emu->rom_buf);
+		emu->rom_buf = NULL;
+	}
+	if (emu->cartridge_filename)
+	{
+		emulator_save_sram(emu);
+		free(emu->cartridge_filename);
+		emu->cartridge_filename = NULL;
+	}
+}
+
 void emulator_shutdown(emulator * emu)
 {
 	CDReader_Deinitialise(&emu->cd);
@@ -912,11 +1026,7 @@ void emulator_shutdown(emulator * emu)
 		Mixer_Deinitialise(&emu->mixer);
 		emu->audio_init = cc_false;
 	}
-	if (emu->rom_buf)
-	{
-		free(emu->rom_buf);
-		emu->rom_buf = NULL;
-	}
+	emulator_unload_cartridge(emu);
 }
 
 /* init and main loop */
