@@ -839,6 +839,21 @@ void emulator_save_sram(emulator * emu)
 	free(strip);
 }
 
+void emulator_unload_cartridge(emulator * emu)
+{
+	if (emu->rom_buf)
+	{
+		free(emu->rom_buf);
+		emu->rom_buf = NULL;
+	}
+	if (emu->cartridge_filename)
+	{
+		emulator_save_sram(emu);
+		free(emu->cartridge_filename);
+		emu->cartridge_filename = NULL;
+	}
+}
+
 int emulator_load_cartridge(emulator * emu, const char * filename)
 {
 	unsigned int i;
@@ -1001,21 +1016,6 @@ void emulator_key(emulator * emu, int keysym, cc_bool down)
 		case XK_Return:
 			emu->buttons[0][CLOWNMDEMU_BUTTON_START] = down;
 			break;
-	}
-}
-
-void emulator_unload_cartridge(emulator * emu)
-{
-	if (emu->rom_buf)
-	{
-		free(emu->rom_buf);
-		emu->rom_buf = NULL;
-	}
-	if (emu->cartridge_filename)
-	{
-		emulator_save_sram(emu);
-		free(emu->cartridge_filename);
-		emu->cartridge_filename = NULL;
 	}
 }
 
