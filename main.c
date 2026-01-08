@@ -918,7 +918,7 @@ int emulator_load_cartridge(emulator * emu, const char * filename)
 	}
 	if (emu->rom_buf)
 	{
-		free(emu->rom_buf);
+		emulator_unload_cartridge(emu);
 	}
 	emu->rom_buf = tmp;
 	ClownMDEmu_SetCartridge(&emu->clownmdemu, emu->rom_buf, emu->rom_size);
