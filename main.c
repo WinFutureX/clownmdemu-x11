@@ -792,6 +792,7 @@ void emulator_load_sram(emulator * emu)
 		else
 		{
 			size = ftell(f);
+			fseek(f, 0, SEEK_SET);
 			if (size > sizeof(emu->clownmdemu.state.external_ram.buffer))
 			{
 				printf("cartridge save ram size exceeds bounds\n");
