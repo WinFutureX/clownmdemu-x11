@@ -112,6 +112,23 @@ typedef struct emulator
 	char * cartridge_filename;
 } emulator;
 
+/* prototypes for misc functions */
+void emulator_init(emulator * emu);
+void emulator_init_audio(emulator * emu);
+void emulator_set_region(emulator * emu, int force_region);
+void emulator_set_options(emulator * emu, cc_bool log_enabled, cc_bool widescreen_enabled);
+void emulator_reset(emulator * emu);
+void emulator_iterate(emulator * emu);
+int emulator_load_file(emulator * emu, const char * filename);
+int emulator_load_cartridge(emulator * emu, const char * filename);
+void emulator_unload_cartridge(emulator * emu);
+int emulator_load_cd(emulator * emu, const char * filename);
+void emulator_unload_cd(emulator * emu);
+void emulator_load_sram(emulator * emu);
+void emulator_save_sram(emulator * emu);
+void emulator_key(emulator * emu, int keysym, cc_bool down);
+void emulator_shutdown(emulator * emu);
+
 /* utility functions */
 void warn(const char * fmt, ...)
 {
@@ -758,101 +775,34 @@ void emulator_iterate(emulator * emu)
 	}
 }
 
-int emulator_load_cd(emulator * emu, const char * filename)
+int emulator_load_file(emulator * emu, const char * filename)
 {
-	CDReader_Open(&emu->cd, NULL, filename, &emu->cd_callbacks);
-	if (!CDReader_IsOpen(&emu->cd))
+	struct stat buf;
+	
+	if (stat(filename, &buf) != 0)
 	{
+		printf("stat failed\n");
 		return 0;
 	}
-	CDReader_SeekToSector(&emu->cd, 0);
-	return 1;
-}
-
-void emulator_load_sram(emulator * emu)
-{
-	FILE * f;
-	size_t size;
-	char * path;
-	char * comb;
-	char * strip;
-	strip = strip_ext(emu->cartridge_filename);
-	comb = append_ext(strip, "srm");
-	path = build_file_path(exe_dir, comb);
-	if (path)
+	
+	if (!S_ISREG(buf.st_mode))
 	{
-		f = fopen(path, "rb");
+		printf("not a file\n");
+		return 0;
 	}
-	if (f)
+	
+	if (emulator_load_cd(emu, filename))
 	{
-		if (fseek(f, 0, SEEK_END) != 0)
+		if (CDReader_IsMegaCDGame(&emu->cd))
 		{
-			printf("unable to seek cartridge save ram file\n");
+			emu->cd_boot = cc_true;
+			printf("booting cd\n");
+			return 1;
 		}
-		else
-		{
-			size = ftell(f);
-			fseek(f, 0, SEEK_SET);
-			if (size > sizeof(emu->clownmdemu.state.external_ram.buffer))
-			{
-				printf("cartridge save ram size exceeds bounds\n");
-			}
-			else
-			{
-				fread(emu->clownmdemu.state.external_ram.buffer, sizeof(emu->clownmdemu.state.external_ram.buffer[0]), size, f);
-			}
-		}
-		fclose(f);
+		CDReader_Close(&emu->cd);
+		emu->cd_boot = cc_false;
 	}
-	free(path);
-	free(comb);
-	free(strip);
-}
-
-void emulator_save_sram(emulator * emu)
-{
-	FILE * f;
-	char * path;
-	char * comb;
-	char * strip;
-	if (emu->clownmdemu.state.external_ram.non_volatile == cc_false || emu->clownmdemu.state.external_ram.size == 0)
-	{
-		return;
-	}
-	strip = strip_ext(emu->cartridge_filename);
-	comb = append_ext(strip, "srm");
-	path = build_file_path(exe_dir, comb);
-	if (path)
-	{
-		f = fopen(path, "w+b");
-	}
-	if (f)
-	{
-		fwrite(emu->clownmdemu.state.external_ram.buffer, sizeof(emu->clownmdemu.state.external_ram.buffer[0]), emu->clownmdemu.state.external_ram.size, f);
-		fclose(f);
-	}
-	else
-	{
-		printf("failed to open %s as cartridge save ram for writing\n", comb);
-	}
-	free(path);
-	free(comb);
-	free(strip);
-}
-
-void emulator_unload_cartridge(emulator * emu)
-{
-	if (emu->rom_buf)
-	{
-		free(emu->rom_buf);
-		emu->rom_buf = NULL;
-	}
-	if (emu->cartridge_filename)
-	{
-		emulator_save_sram(emu);
-		free(emu->cartridge_filename);
-		emu->cartridge_filename = NULL;
-	}
+	return emulator_load_cartridge(emu, filename);
 }
 
 int emulator_load_cartridge(emulator * emu, const char * filename)
@@ -947,34 +897,109 @@ int emulator_load_cartridge(emulator * emu, const char * filename)
 	return 1;
 }
 
-int emulator_load_file(emulator * emu, const char * filename)
+void emulator_unload_cartridge(emulator * emu)
 {
-	struct stat buf;
-	
-	if (stat(filename, &buf) != 0)
+	if (emu->rom_buf)
 	{
-		printf("stat failed\n");
+		free(emu->rom_buf);
+		emu->rom_buf = NULL;
+	}
+	if (emu->cartridge_filename)
+	{
+		emulator_save_sram(emu);
+		free(emu->cartridge_filename);
+		emu->cartridge_filename = NULL;
+	}
+}
+
+int emulator_load_cd(emulator * emu, const char * filename)
+{
+	CDReader_Open(&emu->cd, NULL, filename, &emu->cd_callbacks);
+	if (!CDReader_IsOpen(&emu->cd))
+	{
 		return 0;
 	}
-	
-	if (!S_ISREG(buf.st_mode))
+	CDReader_SeekToSector(&emu->cd, 0);
+	return 1;
+}
+
+void emulator_unload_cd(emulator * emu)
+{
+	if (CDReader_IsOpen(&emu->cd))
 	{
-		printf("not a file\n");
-		return 0;
-	}
-	
-	if (emulator_load_cd(emu, filename))
-	{
-		if (CDReader_IsMegaCDGame(&emu->cd))
-		{
-			emu->cd_boot = cc_true;
-			printf("booting cd\n");
-			return 1;
-		}
 		CDReader_Close(&emu->cd);
-		emu->cd_boot = cc_false;
 	}
-	return emulator_load_cartridge(emu, filename);
+}
+
+void emulator_load_sram(emulator * emu)
+{
+	FILE * f;
+	size_t size;
+	char * path;
+	char * comb;
+	char * strip;
+	strip = strip_ext(emu->cartridge_filename);
+	comb = append_ext(strip, "srm");
+	path = build_file_path(exe_dir, comb);
+	if (path)
+	{
+		f = fopen(path, "rb");
+	}
+	if (f)
+	{
+		if (fseek(f, 0, SEEK_END) != 0)
+		{
+			printf("unable to seek cartridge save ram file\n");
+		}
+		else
+		{
+			size = ftell(f);
+			fseek(f, 0, SEEK_SET);
+			if (size > sizeof(emu->clownmdemu.state.external_ram.buffer))
+			{
+				printf("cartridge save ram size exceeds bounds\n");
+			}
+			else
+			{
+				fread(emu->clownmdemu.state.external_ram.buffer, sizeof(emu->clownmdemu.state.external_ram.buffer[0]), size, f);
+			}
+		}
+		fclose(f);
+	}
+	free(path);
+	free(comb);
+	free(strip);
+}
+
+void emulator_save_sram(emulator * emu)
+{
+	FILE * f;
+	char * path;
+	char * comb;
+	char * strip;
+	if (emu->clownmdemu.state.external_ram.non_volatile == cc_false || emu->clownmdemu.state.external_ram.size == 0)
+	{
+		return;
+	}
+	strip = strip_ext(emu->cartridge_filename);
+	comb = append_ext(strip, "srm");
+	path = build_file_path(exe_dir, comb);
+	if (path)
+	{
+		f = fopen(path, "w+b");
+	}
+	if (f)
+	{
+		fwrite(emu->clownmdemu.state.external_ram.buffer, sizeof(emu->clownmdemu.state.external_ram.buffer[0]), emu->clownmdemu.state.external_ram.size, f);
+		fclose(f);
+	}
+	else
+	{
+		printf("failed to open %s as cartridge save ram for writing\n", comb);
+	}
+	free(path);
+	free(comb);
+	free(strip);
 }
 
 void emulator_key(emulator * emu, int keysym, cc_bool down)
@@ -1022,6 +1047,10 @@ void emulator_key(emulator * emu, int keysym, cc_bool down)
 
 void emulator_shutdown(emulator * emu)
 {
+	if (emu->cd_boot)
+	{
+		emulator_unload_cd(emu);
+	}
 	CDReader_Deinitialise(&emu->cd);
 	if (emu->audio_init)
 	{
