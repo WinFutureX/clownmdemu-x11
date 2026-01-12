@@ -1043,6 +1043,7 @@ void emulator_load_sram(emulator * emu)
 				return;
 			}
 			memcpy(emu->clownmdemu.state.external_ram.buffer, tmp, size);
+			free(tmp);
 		}
 	}
 	free(path);
