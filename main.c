@@ -1059,7 +1059,7 @@ void emulator_shutdown_audio(emulator * emu)
 	if (emu->audio_init)
 	{
 		Mixer_Deinitialise(&emu->mixer);
-		emu->audio_init == cc_false;
+		emu->audio_init = cc_false;
 		free(emu->samples);
 		emu->samples = NULL;
 	}
