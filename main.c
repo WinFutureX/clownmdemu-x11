@@ -66,6 +66,7 @@
 #define BILLION 1000000000L
 #define ROM_SIZE_MAX 0x800000
 #define FRAMEBUFFER_SIZE VDP_MAX_SCANLINE_WIDTH * VDP_MAX_SCANLINES * sizeof(uint32_t)
+#define SAMPLE_BUFFER_SIZE MIXER_MAXIMUM_AUDIO_FRAMES_PER_FRAME * MIXER_CHANNEL_COUNT * sizeof(cc_s16l)
 
 enum
 {
@@ -95,7 +96,7 @@ typedef struct emulator
 	
 	cc_bool audio_init;
 	Mixer_State mixer;
-	cc_s16l samples[MIXER_MAXIMUM_AUDIO_FRAMES_PER_FRAME * MIXER_CHANNEL_COUNT];
+	cc_s16l * samples;
 	size_t audio_bytes;
 
 	int rom_size;
@@ -127,6 +128,7 @@ void emulator_unload_cd(emulator * emu);
 void emulator_load_sram(emulator * emu);
 void emulator_save_sram(emulator * emu);
 void emulator_key(emulator * emu, int keysym, cc_bool down);
+void emulator_shutdown_audio(emulator * emu);
 void emulator_shutdown(emulator * emu);
 
 /* utility functions */
@@ -681,12 +683,19 @@ void emulator_init(emulator * emu)
 void emulator_init_audio(emulator * emu)
 {
 	cc_bool pal = emu->clownmdemu.configuration.tv_standard == CLOWNMDEMU_TV_STANDARD_PAL ? cc_true : cc_false;
-	memset(emu->samples, 0, sizeof(emu->samples));
+	emu->samples = (cc_s16l *) malloc(SAMPLE_BUFFER_SIZE);
+	if (!emu->samples)
+	{
+		warn("unable to alloc sample buffer\n");
+		emu->audio_init = cc_false;
+		return;
+	}
 	emu->audio_init = Mixer_Initialise(&emu->mixer, pal);
 	if (!emu->audio_init)
 	{
 		warn("audio init failed\n");
 	}
+	memset(emu->samples, 0, SAMPLE_BUFFER_SIZE);
 }
 
 void emulator_set_region(emulator * emu, int force_region)
@@ -1045,6 +1054,17 @@ void emulator_key(emulator * emu, int keysym, cc_bool down)
 	}
 }
 
+void emulator_shutdown_audio(emulator * emu)
+{
+	if (emu->audio_init)
+	{
+		Mixer_Deinitialise(&emu->mixer);
+		emu->audio_init == cc_false;
+		free(emu->samples);
+		emu->samples = NULL;
+	}
+}
+
 void emulator_shutdown(emulator * emu)
 {
 	if (emu->cd_boot)
@@ -1052,12 +1072,8 @@ void emulator_shutdown(emulator * emu)
 		emulator_unload_cd(emu);
 	}
 	CDReader_Deinitialise(&emu->cd);
-	if (emu->audio_init)
-	{
-		Mixer_Deinitialise(&emu->mixer);
-		emu->audio_init = cc_false;
-	}
 	emulator_unload_cartridge(emu);
+	emulator_shutdown_audio(emu);
 }
 
 /* init and main loop */
@@ -1207,6 +1223,7 @@ int main(int argc, char ** argv)
 		printf("unable to alloc emu\n");
 		return 1;
 	}
+	memset(emu, 0, sizeof(emulator));
 	
 	emu->framebuffer = (uint32_t *) malloc(FRAMEBUFFER_SIZE);
 	if (!emu->framebuffer)
