@@ -323,6 +323,128 @@ char * strip_ext(const char * filename)
 	return ret;
 }
 
+/* file utilities */
+int file_stat(const char * filename)
+{
+	struct stat attr;
+	
+	if (stat(filename, &attr) != 0)
+	{
+		perror("file_stat");
+		return 0;
+	}
+	
+	return S_ISREG(attr.st_mode);
+}
+
+FILE * file_open(const char * filename)
+{
+	FILE * f;
+	
+	if (!file_stat(filename))
+	{
+		printf("file_open: not a file\n");
+		return NULL;
+	}
+	
+	f = fopen(filename, "rb");
+	if (!f)
+	{
+		perror("file_open");
+		return NULL;
+	}
+	
+	return f;
+}
+
+void file_close(FILE * f)
+{
+	if (f)
+	{
+		fclose(f);
+	}
+}
+
+size_t file_size(const char * filename)
+{
+	FILE * f;
+	size_t size;
+	f = file_open(filename);
+	if (!f)
+	{
+		printf("file_size: open failed\n");
+		return -1;
+	}
+	if (fseek(f, 0, SEEK_END) != 0)
+	{
+		printf("file_size: unable to seek end of file for %s\n", filename);
+		return -1;
+	}
+	size = ftell(f);
+	file_close(f);
+	return size;
+}
+
+unsigned char * file_load(const char * filename, int round_even)
+{
+	FILE * f;
+	size_t size, alloc_size;
+	unsigned char * buf;
+	
+	size = file_size(filename);
+	if (size < 1)
+	{
+		printf("file_load: size error\n");
+		return NULL;
+	}
+	
+	f = file_open(filename);
+	if (!f)
+	{
+		printf("file_load: open failed\n");
+		return NULL;
+	}
+	
+	if (round_even)
+	{
+		alloc_size = size % 2 == 1 ? size + 1 : size;
+	}
+	else
+	{
+		alloc_size = size;
+	}
+	
+	buf = (unsigned char *) malloc(alloc_size);
+	if (!buf)
+	{
+		printf("file_load: buf alloc error\n");
+		file_close(f);
+		return NULL;
+	}
+	
+	if (fread(buf, 1, size, f) != size)
+	{
+		if (feof(f))
+		{
+			printf("file_load: unexpected end of file\n");
+		}
+		else if (ferror(f))
+		{
+			printf("file_load: stream error\n");
+		}
+		else
+		{
+			printf("file_load: unknown error\n");
+		}
+		file_close(f);
+		free(buf);
+		return NULL;
+	}
+	
+	file_close(f);
+	return buf;
+}
+
 /* emulator callbacks */
 void emulator_callback_color_update(void * data, cc_u16f idx, cc_u16f color)
 {
@@ -786,17 +908,9 @@ void emulator_iterate(emulator * emu)
 
 int emulator_load_file(emulator * emu, const char * filename)
 {
-	struct stat buf;
-	
-	if (stat(filename, &buf) != 0)
+	if (!file_stat(filename))
 	{
-		printf("stat failed\n");
-		return 0;
-	}
-	
-	if (!S_ISREG(buf.st_mode))
-	{
-		printf("not a file\n");
+		printf("emulator_load_file: %s is not a file\n", filename);
 		return 0;
 	}
 	
@@ -817,69 +931,32 @@ int emulator_load_file(emulator * emu, const char * filename)
 int emulator_load_cartridge(emulator * emu, const char * filename)
 {
 	unsigned int i;
-	FILE * f;
 	size_t size;
 	size_t alloc_size;
 	cc_u16l * tmp;
 	char * file;
-	f = fopen(filename, "rb");
-	if (!f)
+	
+	size = file_size(filename);
+	if ((long) size == -1)
 	{
-		perror("unable to open file");
+		printf("emulator_load_cartridge: size error\n");
 		return 0;
 	}
-	if (fseek(f, 0, SEEK_END) != 0)
+	else if (size > ROM_SIZE_MAX)
 	{
-		printf("unable to seek to end of file\n");
-		fclose(f);
+		printf("emulator_load_cartridge: size exceeds bounds\n");
 		return 0;
 	}
-	size = ftell(f);
-	if (size > ROM_SIZE_MAX || size < 1)
-	{
-		printf("size out of bounds\n");
-		fclose(f);
-		return 0;
-	}
-	if (size % 2 == 1)
-	{
-		alloc_size = size + 1;
-	}
-	else
-	{
-		alloc_size = size;
-	}
-	tmp = (cc_u16l *) malloc(alloc_size);
+	
+	alloc_size = size % 2 == 1 ? size + 1 : size;
+	
+	tmp = (cc_u16l *) file_load(filename, 1);
 	if (!tmp)
 	{
-		printf("unable to allocate rom buffer");
-		fclose(f);
+		printf("emulator_load_cartridge: buffer allocation error\n");
 		return 0;
 	}
-	if (fseek(f, 0, SEEK_SET) != 0)
-	{
-		printf("unable to seek to start of file\n");
-		fclose(f);
-		return 0;
-	}
-	if (fread(tmp, 1, size, f) != size)
-	{
-		/* error handling */
-		if (feof(f))
-		{
-			printf("unexpected EOF\n");
-		}
-		else if (ferror(f))
-		{
-			printf("unable to read file\n");
-		}
-		else
-		{
-			printf("unknown read error\n");
-		}
-		fclose(f);
-		return 0;
-	}
+	
 	emu->rom_size = size;
 	memset(emu->rom_regions, 0, sizeof(emu->rom_regions));
 	if (emu->rom_size >= 0x1F3)
@@ -901,7 +978,6 @@ int emulator_load_cartridge(emulator * emu, const char * filename)
 	file = strdup(filename);
 	emu->cartridge_filename = strdup(basename(file));
 	free(file);
-	fclose(f);
 	emulator_load_sram(emu);
 	return 1;
 }
@@ -942,38 +1018,32 @@ void emulator_unload_cd(emulator * emu)
 
 void emulator_load_sram(emulator * emu)
 {
-	FILE * f;
 	size_t size;
 	char * path;
 	char * comb;
 	char * strip;
+	cc_u8l * tmp;
 	strip = strip_ext(emu->cartridge_filename);
 	comb = append_ext(strip, "srm");
 	path = build_file_path(exe_dir, comb);
 	if (path)
 	{
-		f = fopen(path, "rb");
-	}
-	if (f)
-	{
-		if (fseek(f, 0, SEEK_END) != 0)
+		if (access(path, F_OK) == 0)
 		{
-			printf("unable to seek cartridge save ram file\n");
-		}
-		else
-		{
-			size = ftell(f);
-			fseek(f, 0, SEEK_SET);
+			size = file_size(path);
 			if (size > sizeof(emu->clownmdemu.state.external_ram.buffer))
 			{
-				printf("cartridge save ram size exceeds bounds\n");
+				printf("emulator_load_sram: cartridge save ram size exceeds bounds\n");
+				return;
 			}
-			else
+			tmp = (cc_u8l *) file_load(path, 0);
+			if (!tmp)
 			{
-				fread(emu->clownmdemu.state.external_ram.buffer, sizeof(emu->clownmdemu.state.external_ram.buffer[0]), size, f);
+				printf("emulator_load_sram: load error\n");
+				return;
 			}
+			memcpy(emu->clownmdemu.state.external_ram.buffer, tmp, size);
 		}
-		fclose(f);
 	}
 	free(path);
 	free(comb);
