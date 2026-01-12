@@ -988,6 +988,7 @@ void emulator_unload_cartridge(emulator * emu)
 	{
 		free(emu->rom_buf);
 		emu->rom_buf = NULL;
+		ClownMDEmu_SetCartridge(&emu->clownmdemu, NULL, 0);
 	}
 	if (emu->cartridge_filename)
 	{
