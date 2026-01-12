@@ -1299,7 +1299,7 @@ int main(int argc, char ** argv)
 	audio_params.bps = SIO_BPS(16);
 	audio_params.le = SIO_LE_NATIVE;
 	audio_params.pchan = MIXER_CHANNEL_COUNT;
-	audio_params.rate = MIXER_OUTPUT_SAMPLE_RATE;
+	audio_params.rate = emu->clownmdemu.configuration.tv_standard == CLOWNMDEMU_TV_STANDARD_PAL ? MIXER_OUTPUT_SAMPLE_RATE_PAL : MIXER_OUTPUT_SAMPLE_RATE_NTSC;
 	audio_params.xrun = SIO_IGNORE;
 	if (!sio_setpar(audio_device, &audio_params))
 	{
