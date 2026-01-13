@@ -324,36 +324,33 @@ char * strip_ext(const char * filename)
 }
 
 /* file utilities */
-int file_stat(const char * filename)
+int file_exists(const char * filename)
+{
+	return access(filename, F_OK) == 0;
+}
+
+int file_is_file(const char * filename)
 {
 	struct stat attr;
-	
 	if (stat(filename, &attr) != 0)
 	{
-		perror("file_stat");
 		return 0;
 	}
-	
 	return S_ISREG(attr.st_mode);
 }
 
 FILE * file_open(const char * filename)
 {
 	FILE * f;
-	
-	if (!file_stat(filename))
+	if (!file_is_file(filename))
 	{
-		printf("file_open: not a file\n");
 		return NULL;
 	}
-	
 	f = fopen(filename, "rb");
 	if (!f)
 	{
-		perror("file_open");
 		return NULL;
 	}
-	
 	return f;
 }
 
@@ -365,19 +362,17 @@ void file_close(FILE * f)
 	}
 }
 
-size_t file_size(const char * filename)
+long file_size(const char * filename)
 {
 	FILE * f;
 	size_t size;
 	f = file_open(filename);
 	if (!f)
 	{
-		printf("file_size: open failed\n");
 		return -1;
 	}
 	if (fseek(f, 0, SEEK_END) != 0)
 	{
-		printf("file_size: unable to seek end of file for %s\n", filename);
 		return -1;
 	}
 	size = ftell(f);
@@ -385,64 +380,39 @@ size_t file_size(const char * filename)
 	return size;
 }
 
-unsigned char * file_load(const char * filename, int round_even)
+int file_load_to_buffer(const char * filename, unsigned char ** out_buf, size_t * out_size)
 {
+	long size;
+	size_t buf_size;
 	FILE * f;
-	size_t size, alloc_size;
-	unsigned char * buf;
-	
+	int ret = 0;
 	size = file_size(filename);
 	if (size < 1)
 	{
-		printf("file_load: size error\n");
-		return NULL;
+		return ret;
 	}
-	
+	buf_size = size % 2 == 1 ? size + 1 : size;
 	f = file_open(filename);
-	if (!f)
+	if (f)
 	{
-		printf("file_load: open failed\n");
-		return NULL;
-	}
-	
-	if (round_even)
-	{
-		alloc_size = size % 2 == 1 ? size + 1 : size;
-	}
-	else
-	{
-		alloc_size = size;
-	}
-	
-	buf = (unsigned char *) malloc(alloc_size);
-	if (!buf)
-	{
-		printf("file_load: buf alloc error\n");
-		file_close(f);
-		return NULL;
-	}
-	
-	if (fread(buf, 1, size, f) != size)
-	{
-		if (feof(f))
+		unsigned char * buf = (unsigned char *) malloc(buf_size);
+		if (buf)
 		{
-			printf("file_load: unexpected end of file\n");
-		}
-		else if (ferror(f))
-		{
-			printf("file_load: stream error\n");
-		}
-		else
-		{
-			printf("file_load: unknown error\n");
+			if (fseek(f, 0, SEEK_SET) == 0)
+			{
+				if (fread(buf, 1, (size_t) size, f) == (size_t) size)
+				{
+					*out_buf = buf;
+					*out_size = size;
+					buf = NULL;
+					ret = 1;
+				}
+			}
+			free(buf);
 		}
 		file_close(f);
-		free(buf);
-		return NULL;
 	}
-	
-	file_close(f);
-	return buf;
+	return ret;
 }
 
 /* emulator callbacks */
@@ -908,7 +878,13 @@ void emulator_iterate(emulator * emu)
 
 int emulator_load_file(emulator * emu, const char * filename)
 {
-	if (!file_stat(filename))
+	if (!file_exists(filename))
+	{
+		printf("emulator_load_file: %s does not exist\n", filename);
+		return 0;
+	}
+	
+	if (!file_is_file(filename))
 	{
 		printf("emulator_load_file: %s is not a file\n", filename);
 		return 0;
@@ -931,13 +907,13 @@ int emulator_load_file(emulator * emu, const char * filename)
 int emulator_load_cartridge(emulator * emu, const char * filename)
 {
 	unsigned int i;
-	size_t size;
+	long size;
 	size_t alloc_size;
 	cc_u16l * tmp;
 	char * file;
 	
 	size = file_size(filename);
-	if ((long) size == -1)
+	if (size == -1)
 	{
 		printf("emulator_load_cartridge: size error\n");
 		return 0;
@@ -950,10 +926,9 @@ int emulator_load_cartridge(emulator * emu, const char * filename)
 	
 	alloc_size = size % 2 == 1 ? size + 1 : size;
 	
-	tmp = (cc_u16l *) file_load(filename, 1);
-	if (!tmp)
+	if (!file_load_to_buffer(filename, (unsigned char **) &tmp, &alloc_size))
 	{
-		printf("emulator_load_cartridge: buffer allocation error\n");
+		printf("emulator_load_cartridge: load error\n");
 		return 0;
 	}
 	
@@ -1037,14 +1012,16 @@ void emulator_load_sram(emulator * emu)
 				printf("emulator_load_sram: cartridge save ram size exceeds bounds\n");
 				return;
 			}
-			tmp = (cc_u8l *) file_load(path, 0);
-			if (!tmp)
+			if (file_load_to_buffer(path, &tmp, &size))
+			{
+				memcpy(emu->clownmdemu.state.external_ram.buffer, tmp, size);
+				free(tmp);
+			}
+			else
 			{
 				printf("emulator_load_sram: load error\n");
 				return;
 			}
-			memcpy(emu->clownmdemu.state.external_ram.buffer, tmp, size);
-			free(tmp);
 		}
 	}
 	free(path);
@@ -1151,6 +1128,7 @@ void emulator_shutdown(emulator * emu)
 /* init and main loop */
 int main(int argc, char ** argv)
 {
+	int ret;
 	long ns_desired;
 	
 	emulator * emu;
@@ -1186,11 +1164,12 @@ int main(int argc, char ** argv)
 	struct sio_par audio_params;
 #endif
 #endif
+	ret = 1;
 	
 	if (argc < 2)
 	{
 		usage(argv[0]);
-		return 1;
+		return ret;
 	}
 	
 	log_enabled = cc_false;
@@ -1210,7 +1189,7 @@ int main(int argc, char ** argv)
 			if (strlen(argv[i]) < 2)
 			{
 				printf("invalid empty flag\n");
-				return 1;
+				return ret;
 			}
 			
 			switch (argv[i][1])
@@ -1218,12 +1197,12 @@ int main(int argc, char ** argv)
 				case 'h':
 				case '?':
 					usage(argv[0]);
-					return 0;
+					return ret;
 				case 'r':
 					if (i == argc - 1)
 					{
 						printf("unexpected end of args\n");
-						return 1;
+						return ret;
 					}
 					else
 					{
@@ -1244,7 +1223,7 @@ int main(int argc, char ** argv)
 								break;
 							default:
 								printf("region must be u, j, or e\n");
-								return 1;
+								return ret;
 						}
 					}
 					break;
@@ -1257,7 +1236,7 @@ int main(int argc, char ** argv)
 				default:
 					printf("unknown flag %s\n", argv[i]);
 					usage(argv[0]);
-					return 1;
+					return ret;
 			}
 		}
 		else
@@ -1270,7 +1249,7 @@ int main(int argc, char ** argv)
 			else
 			{
 				printf("specify only 1 filename\n");
-				return 1;
+				return ret;
 			}
 		}
 	}
@@ -1278,7 +1257,7 @@ int main(int argc, char ** argv)
 	if (!filename)
 	{
 		printf("no filename specified\n");
-		return 1;
+		return ret;
 	}
 	
 	if (!exe_dir_init(argv[0], exe_dir, sizeof(exe_dir)))
@@ -1293,7 +1272,7 @@ int main(int argc, char ** argv)
 	if (!emu)
 	{
 		printf("unable to alloc emu\n");
-		return 1;
+		return ret;
 	}
 	memset(emu, 0, sizeof(emulator));
 	
@@ -1301,7 +1280,7 @@ int main(int argc, char ** argv)
 	if (!emu->framebuffer)
 	{
 		printf("unable to alloc internal framebuffer\n");
-		return 1;
+		goto cleanup_emu;
 	}
 	
 	/* init window */
@@ -1311,14 +1290,14 @@ int main(int argc, char ** argv)
 	if (!display)
 	{
 		printf("unable to open display\n");
-		return 1;
+		goto cleanup_emu;
 	}
 	root = DefaultRootWindow(display);
 	default_screen = DefaultScreen(display);
 	if (!XMatchVisualInfo(display, default_screen, bit_depth, TrueColor, &vis_info))
 	{
 		printf("no matching visual info\n");
-		return 1;
+		goto cleanup_x11_display;
 	}
 	window_attr.background_pixel = 0;
 	window_attr.colormap = XCreateColormap(display, root, vis_info.visual, AllocNone);
@@ -1327,7 +1306,7 @@ int main(int argc, char ** argv)
 	if (!window)
 	{
 		printf("unable to create window\n");
-		return 1;
+		goto cleanup_x11_display;
 	}
 	XStoreName(display, window, "clownmdemu");
 	hints.flags = PMinSize | PMaxSize;
@@ -1342,14 +1321,14 @@ int main(int argc, char ** argv)
 	if (!x_window_buffer)
 	{
 		printf("unable to create window image\n");
-		return 1;
+		goto cleanup_x11_display;
 	}
 	default_gc = DefaultGC(display, default_screen);
 	wm_delete_window = XInternAtom(display, "WM_DELETE_WINDOW", False);
 	if (!XSetWMProtocols(display, window, &wm_delete_window, 1))
 	{
 		printf("unable to intercept window close event\n");
-		return 1;
+		goto cleanup_x11_window;
 	}
 	
 	/* init emu */
@@ -1359,7 +1338,7 @@ int main(int argc, char ** argv)
 	if (!emulator_load_file(emu, filename))
 	{
 		printf("unable to load file\n");
-		return 1;
+		goto cleanup_x11_window;
 	}
 	emulator_set_region(emu, region);
 	emulator_init_audio(emu);
@@ -1374,14 +1353,14 @@ int main(int argc, char ** argv)
 	if (!audio_device)
 	{
 		printf("unable to create audio device: %s\n", pa_strerror(audio_error));
-		return 1;
+		goto cleanup_x11_window;
 	}
 #elif defined(__OpenBSD__)
 	audio_device = sio_open(SIO_DEVANY, SIO_PLAY, 0);
 	if (!audio_device)
 	{
 		printf("unable to open audio device\n");
-		return 1;
+		goto cleanup_x11_window;
 	}
 	sio_initpar(&audio_params);
 	audio_params.bits = 16;
@@ -1393,12 +1372,12 @@ int main(int argc, char ** argv)
 	if (!sio_setpar(audio_device, &audio_params))
 	{
 		printf("unable to set audio properties\n");
-		return 1;
+		goto cleanup_x11_window;
 	}
 	if (!sio_start(audio_device))
 	{
 		printf("unable to start audio device\n");
-		return 1;
+		goto cleanup_x11_window;
 	}
 #endif
 #endif
@@ -1492,13 +1471,7 @@ int main(int argc, char ** argv)
 			}
 		}
 	}
-	
-	XDestroyWindow(display, window);
-	XDestroyImage(x_window_buffer);
-	XCloseDisplay(display);
-	
-	emulator_shutdown(emu);
-	free(emu);
+	ret = 0;
 #ifndef DISABLE_AUDIO
 #if defined(__linux__)
 	pa_simple_drain(audio_device, &audio_error);
@@ -1508,5 +1481,13 @@ int main(int argc, char ** argv)
 	sio_close(audio_device);
 #endif
 #endif
-	return 0;
+cleanup_x11_window:
+	XDestroyWindow(display, window);
+	XDestroyImage(x_window_buffer);
+cleanup_x11_display:
+	XCloseDisplay(display);
+cleanup_emu:
+	emulator_shutdown(emu);
+	free(emu);
+	return ret;
 }
