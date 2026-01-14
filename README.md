@@ -57,6 +57,8 @@ Additional options:
 | Start            | Return / Enter |
 | Mode             | F              |
 | Soft reset       | Tab            |
+| Quick save state | F5             |
+| Quick load state | F8             |
 | Quit             | Esc            |
 
 ## Licence
