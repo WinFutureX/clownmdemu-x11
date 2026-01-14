@@ -8,10 +8,10 @@ What you get:
 - Region autodetection (for cartridges only)
 - Cartridge save RAM
 - Mega-CD save RAM
+- Save states (quick save/load)
 
 What you **don't** get:
 - A pretty UI
-- Save states
 - Remappable controls
 
 ## Building

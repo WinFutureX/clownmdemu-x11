@@ -68,6 +68,9 @@
 #define FRAMEBUFFER_SIZE VDP_MAX_SCANLINE_WIDTH * VDP_MAX_SCANLINES * sizeof(uint32_t)
 #define SAMPLE_BUFFER_SIZE MIXER_MAXIMUM_AUDIO_FRAMES_PER_FRAME * MIXER_CHANNEL_COUNT * sizeof(cc_s16l)
 
+/* save state magic number, for compatibility with reference frontend */
+const char save_state_magic[8] = "CMDEFSS";
+
 enum
 {
 	REGION_UNSPECIFIED,
@@ -93,6 +96,10 @@ typedef struct emulator
 	CDReader_State cd;
 	ClownCD_FileCallbacks cd_callbacks;
 	cc_bool cd_boot;
+	
+	ClownMDEmu_StateBackup state_backup;
+	CDReader_StateBackup cd_backup;
+	uint32_t colors_backup[VDP_TOTAL_COLOURS];
 	
 	cc_bool audio_init;
 	Mixer_State mixer;
@@ -127,6 +134,8 @@ int emulator_load_cd(emulator * emu, const char * filename);
 void emulator_unload_cd(emulator * emu);
 void emulator_load_sram(emulator * emu);
 void emulator_save_sram(emulator * emu);
+void emulator_load_state(emulator * emu);
+void emulator_save_state(emulator * emu);
 void emulator_key(emulator * emu, int keysym, cc_bool down);
 void emulator_shutdown_audio(emulator * emu);
 void emulator_shutdown(emulator * emu);
@@ -1060,6 +1069,108 @@ void emulator_save_sram(emulator * emu)
 	free(strip);
 }
 
+void emulator_load_state(emulator * emu)
+{
+	char tmp[8];
+	FILE * f;
+	char * path;
+	char * comb;
+	char * strip;
+	size_t read;
+	const size_t expected = sizeof(save_state_magic) + sizeof(ClownMDEmu_StateBackup) + sizeof(CDReader_StateBackup) + sizeof(emu->colors_backup);
+	strip = strip_ext(emu->cartridge_filename);
+	comb = append_ext(strip, "state");
+	path = build_file_path(exe_dir, comb);
+	if (path)
+	{
+		if (file_size(path) < (long) expected)
+		{
+			printf("state file size mismatch, got %ld bytes, expected %lu\n", file_size(path), expected);
+		}
+		else
+		{
+			f = file_open(path);
+			if (!f)
+			{
+				printf("unable to load state file %s\n", path);
+			}
+			else
+			{
+				read = fread(tmp, 1, sizeof(save_state_magic), f);
+				if (read < sizeof(save_state_magic) || strcmp(save_state_magic, tmp) != 0)
+				{
+					printf("state file signature invalid\n");
+				}
+				else
+				{
+					read += fread(&emu->state_backup, 1, sizeof(ClownMDEmu_StateBackup), f);
+					read += fread(&emu->cd_backup, 1, sizeof(CDReader_StateBackup), f);
+					read += fread(emu->colors_backup, 1, sizeof(emu->colors_backup), f);
+					if (read < expected)
+					{
+						printf("state read error, got %lu bytes, expected %lu\n", read, expected);
+					}
+					else
+					{
+						ClownMDEmu_LoadState(&emu->clownmdemu, &emu->state_backup);
+						CDReader_LoadState(&emu->cd, &emu->cd_backup);
+						memcpy(emu->colors, emu->colors_backup, sizeof(emu->colors_backup));
+						printf("state loaded successfully from %s\n", path);
+					}
+				}
+				file_close(f);
+			}
+			
+		}
+	}
+	free(path);
+	free(comb);
+	free(strip);
+}
+
+void emulator_save_state(emulator * emu)
+{
+	FILE * f;
+	char * path;
+	char * comb;
+	char * strip;
+	size_t written;
+	const size_t expected = sizeof(save_state_magic) + sizeof(ClownMDEmu_StateBackup) + sizeof(CDReader_StateBackup) + sizeof(emu->colors_backup);
+	strip = strip_ext(emu->cartridge_filename);
+	comb = append_ext(strip, "state");
+	path = build_file_path(exe_dir, comb);
+	if (path)
+	{
+		ClownMDEmu_SaveState(&emu->clownmdemu, &emu->state_backup);
+		CDReader_SaveState(&emu->cd, &emu->cd_backup);
+		memcpy(emu->colors_backup, emu->colors, sizeof(emu->colors));
+		f = fopen(path, "w+b");
+		if (f)
+		{
+			written = fwrite(save_state_magic, 1, sizeof(save_state_magic), f);
+			written += fwrite(&emu->state_backup, 1, sizeof(ClownMDEmu_StateBackup), f);
+			written += fwrite(&emu->cd_backup, 1, sizeof(CDReader_StateBackup), f);
+			written += fwrite(&emu->colors_backup, 1, sizeof(emu->colors_backup), f);
+			if (written < expected)
+			{
+				printf("state write error, got %lu bytes, expected %lu\n", written, expected);
+			}
+			else
+			{
+				printf("state saved successfully to %s\n", path);
+			}
+			fclose(f);
+		}
+		else
+		{
+			printf("failed to save state to %s\n", path);
+		}
+	}
+	free(path);
+	free(comb);
+	free(strip);
+}
+
 void emulator_key(emulator * emu, int keysym, cc_bool down)
 {
 	switch (keysym)
@@ -1416,23 +1527,34 @@ int main(int argc, char ** argv)
 				case KeyPress:
 					ek = (XKeyPressedEvent *) &ev;
 					keysym = XkbKeycodeToKeysym(display, ek->keycode, 0, 0);
-					if (keysym == XK_Escape)
+					switch (keysym)
 					{
-						running = 0;
-					}
-					else if (keysym == XK_Tab)
-					{
-						emulator_reset(emu);
-					}
-					else
-					{
-						emulator_key(emu, keysym, cc_true);
+						case XK_Escape:
+							running = 0;
+							break;
+						case XK_Tab:
+							emulator_reset(emu);
+							break;
+						default:
+							emulator_key(emu, keysym, cc_true);
+							break;
 					}
 					break;
 				case KeyRelease:
 					ek = (XKeyPressedEvent *) &ev;
 					keysym = XkbKeycodeToKeysym(display, ek->keycode, 0, 0);
-					emulator_key(emu, keysym, cc_false);
+					switch (keysym)
+					{
+						case XK_F5:
+							emulator_save_state(emu);
+							break;
+						case XK_F8:
+							emulator_load_state(emu);
+							break;
+						default:
+							emulator_key(emu, keysym, cc_false);
+							break;
+					}
 					break;
 			}
 		}
