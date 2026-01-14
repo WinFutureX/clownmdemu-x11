@@ -1,4 +1,5 @@
 clownmdemu
 *.brm
 *.srm
+*.state
 *.o
