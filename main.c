@@ -893,7 +893,6 @@ void emulator_iterate(emulator * emu)
 
 int emulator_load_file(emulator * emu, const char * filename)
 {
-	char * tmp;
 	if (!file_exists(filename))
 	{
 		printf("emulator_load_file: %s does not exist\n", filename);
@@ -910,17 +909,11 @@ int emulator_load_file(emulator * emu, const char * filename)
 	{
 		if (CDReader_IsMegaCDGame(&emu->cd))
 		{
-			tmp = strdup(filename);
 			emu->cd_boot = cc_true;
-			if (tmp)
-			{
-				emu->cd_filename = strdup(basename(tmp));
-				free(tmp);
-			}
 			printf("booting cd\n");
 			return 1;
 		}
-		CDReader_Close(&emu->cd);
+		emulator_unload_cd(emu);
 		emu->cd_boot = cc_false;
 	}
 	return emulator_load_cartridge(emu, filename);
@@ -997,12 +990,19 @@ void emulator_unload_cartridge(emulator * emu)
 
 int emulator_load_cd(emulator * emu, const char * filename)
 {
+	char * tmp;
 	CDReader_Open(&emu->cd, NULL, filename, &emu->cd_callbacks);
 	if (!CDReader_IsOpen(&emu->cd))
 	{
 		return 0;
 	}
 	CDReader_SeekToSector(&emu->cd, 0);
+	tmp = strdup(filename);
+	if (tmp)
+	{
+		emu->cd_filename = strdup(basename(tmp));
+		free(tmp);
+	}
 	return 1;
 }
 
