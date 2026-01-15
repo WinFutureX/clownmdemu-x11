@@ -68,17 +68,19 @@
 #define FRAMEBUFFER_SIZE VDP_MAX_SCANLINE_WIDTH * VDP_MAX_SCANLINES * sizeof(uint32_t)
 #define SAMPLE_BUFFER_SIZE MIXER_MAXIMUM_AUDIO_FRAMES_PER_FRAME * MIXER_CHANNEL_COUNT * sizeof(cc_s16l)
 
+typedef uint32_t palette[VDP_TOTAL_COLOURS];
+
 /* save state magic number, for compatibility with reference frontend */
 const char save_state_magic[8] = "CMDEFSS";
-const size_t save_state_size = sizeof(save_state_magic) + sizeof(ClownMDEmu_StateBackup) + sizeof(CDReader_StateBackup) + (sizeof(uint32_t) * VDP_TOTAL_COLOURS);
+const size_t save_state_size = sizeof(save_state_magic) + sizeof(ClownMDEmu_StateBackup) + sizeof(CDReader_StateBackup) + sizeof(palette);
 
-enum
+typedef enum region
 {
 	REGION_UNSPECIFIED,
 	REGION_US,
 	REGION_JP,
 	REGION_EU
-};
+} region;
 
 /* path stuff */
 const char path_sep = '/';
@@ -100,7 +102,7 @@ typedef struct emulator
 	
 	ClownMDEmu_StateBackup state_backup;
 	CDReader_StateBackup cd_backup;
-	uint32_t colors_backup[VDP_TOTAL_COLOURS];
+	palette colors_backup;
 	
 	cc_bool audio_init;
 	Mixer_State mixer;
@@ -110,7 +112,7 @@ typedef struct emulator
 	int rom_size;
 	int width;
 	int height;
-	uint32_t colors[VDP_TOTAL_COLOURS];
+	palette colors;
 	uint32_t * framebuffer;
 	cc_bool buttons[2][CLOWNMDEMU_BUTTON_MAX];
 	cc_u16l * rom_buf;
@@ -125,7 +127,7 @@ typedef struct emulator
 /* prototypes for misc functions */
 void emulator_init(emulator * emu);
 void emulator_init_audio(emulator * emu);
-void emulator_set_region(emulator * emu, int force_region);
+void emulator_set_region(emulator * emu, region force_region);
 void emulator_set_options(emulator * emu, cc_bool log_enabled, cc_bool widescreen_enabled);
 void emulator_reset(emulator * emu);
 void emulator_iterate(emulator * emu);
@@ -805,9 +807,9 @@ void emulator_init_audio(emulator * emu)
 	memset(emu->samples, 0, SAMPLE_BUFFER_SIZE);
 }
 
-void emulator_set_region(emulator * emu, int force_region)
+void emulator_set_region(emulator * emu, region force_region)
 {
-	int detect_region = force_region;
+	region detect_region = force_region;
 	if (detect_region == REGION_UNSPECIFIED)
 	{
 		if (!emu->cd_boot)
@@ -1122,7 +1124,7 @@ void emulator_load_state(emulator * emu)
 				{
 					read += fread(&emu->state_backup, 1, sizeof(ClownMDEmu_StateBackup), f);
 					read += fread(&emu->cd_backup, 1, sizeof(CDReader_StateBackup), f);
-					read += fread(emu->colors_backup, 1, sizeof(emu->colors_backup), f);
+					read += fread(emu->colors_backup, 1, sizeof(palette), f);
 					if (read != save_state_size)
 					{
 						printf("state read error, got %lu bytes, expected %lu\n", read, save_state_size);
@@ -1166,7 +1168,7 @@ void emulator_save_state(emulator * emu)
 			written = fwrite(save_state_magic, 1, sizeof(save_state_magic), f);
 			written += fwrite(&emu->state_backup, 1, sizeof(ClownMDEmu_StateBackup), f);
 			written += fwrite(&emu->cd_backup, 1, sizeof(CDReader_StateBackup), f);
-			written += fwrite(&emu->colors_backup, 1, sizeof(emu->colors_backup), f);
+			written += fwrite(&emu->colors_backup, 1, sizeof(palette), f);
 			if (written != save_state_size)
 			{
 				printf("state write error, got %lu bytes, expected %lu\n", written, save_state_size);
