@@ -118,6 +118,7 @@ typedef struct emulator
 	
 	FILE * bram;
 	char * cartridge_filename;
+	char * cd_filename;
 } emulator;
 
 /* prototypes for misc functions */
@@ -984,12 +985,19 @@ void emulator_unload_cartridge(emulator * emu)
 
 int emulator_load_cd(emulator * emu, const char * filename)
 {
+	char * tmp;
 	CDReader_Open(&emu->cd, NULL, filename, &emu->cd_callbacks);
 	if (!CDReader_IsOpen(&emu->cd))
 	{
 		return 0;
 	}
+	tmp = strdup(filename);
 	CDReader_SeekToSector(&emu->cd, 0);
+	if (tmp)
+	{
+		emu->cd_filename = strdup(basename(tmp));
+		free(tmp);
+	}
 	return 1;
 }
 
@@ -998,6 +1006,11 @@ void emulator_unload_cd(emulator * emu)
 	if (CDReader_IsOpen(&emu->cd))
 	{
 		CDReader_Close(&emu->cd);
+	}
+	if (emu->cd_filename)
+	{
+		free(emu->cd_filename);
+		emu->cd_filename = NULL;
 	}
 }
 
@@ -1078,7 +1091,7 @@ void emulator_load_state(emulator * emu)
 	char * strip;
 	size_t read;
 	const size_t expected = sizeof(save_state_magic) + sizeof(ClownMDEmu_StateBackup) + sizeof(CDReader_StateBackup) + sizeof(emu->colors_backup);
-	strip = strip_ext(emu->cartridge_filename);
+	strip = strip_ext(emu->cartridge_filename ? emu->cartridge_filename : emu->cd_filename);
 	comb = append_ext(strip, "state");
 	path = build_file_path(exe_dir, comb);
 	if (path)
@@ -1136,7 +1149,7 @@ void emulator_save_state(emulator * emu)
 	char * strip;
 	size_t written;
 	const size_t expected = sizeof(save_state_magic) + sizeof(ClownMDEmu_StateBackup) + sizeof(CDReader_StateBackup) + sizeof(emu->colors_backup);
-	strip = strip_ext(emu->cartridge_filename);
+	strip = strip_ext(emu->cartridge_filename ? emu->cartridge_filename : emu->cd_filename);
 	comb = append_ext(strip, "state");
 	path = build_file_path(exe_dir, comb);
 	if (path)
