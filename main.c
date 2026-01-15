@@ -70,6 +70,7 @@
 
 /* save state magic number, for compatibility with reference frontend */
 const char save_state_magic[8] = "CMDEFSS";
+const size_t save_state_size = sizeof(save_state_magic) + sizeof(ClownMDEmu_StateBackup) + sizeof(CDReader_StateBackup) + (sizeof(uint32_t) * VDP_TOTAL_COLOURS);
 
 enum
 {
@@ -1090,15 +1091,14 @@ void emulator_load_state(emulator * emu)
 	char * comb;
 	char * strip;
 	size_t read;
-	const size_t expected = sizeof(save_state_magic) + sizeof(ClownMDEmu_StateBackup) + sizeof(CDReader_StateBackup) + sizeof(emu->colors_backup);
 	strip = strip_ext(emu->cartridge_filename ? emu->cartridge_filename : emu->cd_filename);
 	comb = append_ext(strip, "state");
 	path = build_file_path(exe_dir, comb);
 	if (path)
 	{
-		if (file_size(path) < (long) expected)
+		if (file_size(path) != (long) save_state_size)
 		{
-			printf("state file size mismatch, got %ld bytes, expected %lu\n", file_size(path), expected);
+			printf("state file size mismatch, got %ld bytes, expected %lu\n", file_size(path), save_state_size);
 		}
 		else
 		{
@@ -1119,9 +1119,9 @@ void emulator_load_state(emulator * emu)
 					read += fread(&emu->state_backup, 1, sizeof(ClownMDEmu_StateBackup), f);
 					read += fread(&emu->cd_backup, 1, sizeof(CDReader_StateBackup), f);
 					read += fread(emu->colors_backup, 1, sizeof(emu->colors_backup), f);
-					if (read < expected)
+					if (read != save_state_size)
 					{
-						printf("state read error, got %lu bytes, expected %lu\n", read, expected);
+						printf("state read error, got %lu bytes, expected %lu\n", read, save_state_size);
 					}
 					else
 					{
@@ -1148,7 +1148,6 @@ void emulator_save_state(emulator * emu)
 	char * comb;
 	char * strip;
 	size_t written;
-	const size_t expected = sizeof(save_state_magic) + sizeof(ClownMDEmu_StateBackup) + sizeof(CDReader_StateBackup) + sizeof(emu->colors_backup);
 	strip = strip_ext(emu->cartridge_filename ? emu->cartridge_filename : emu->cd_filename);
 	comb = append_ext(strip, "state");
 	path = build_file_path(exe_dir, comb);
@@ -1164,9 +1163,9 @@ void emulator_save_state(emulator * emu)
 			written += fwrite(&emu->state_backup, 1, sizeof(ClownMDEmu_StateBackup), f);
 			written += fwrite(&emu->cd_backup, 1, sizeof(CDReader_StateBackup), f);
 			written += fwrite(&emu->colors_backup, 1, sizeof(emu->colors_backup), f);
-			if (written < expected)
+			if (written != save_state_size)
 			{
-				printf("state write error, got %lu bytes, expected %lu\n", written, expected);
+				printf("state write error, got %lu bytes, expected %lu\n", written, save_state_size);
 			}
 			else
 			{
