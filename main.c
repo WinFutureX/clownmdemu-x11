@@ -129,7 +129,7 @@ void emulator_init(emulator * emu);
 void emulator_init_audio(emulator * emu);
 void emulator_set_region(emulator * emu, region force_region);
 void emulator_set_options(emulator * emu, cc_bool log_enabled, cc_bool widescreen_enabled);
-void emulator_reset(emulator * emu);
+void emulator_reset(emulator * emu, cc_bool hard);
 void emulator_iterate(emulator * emu);
 int emulator_load_file(emulator * emu, const char * filename);
 int emulator_load_cartridge(emulator * emu, const char * filename);
@@ -868,9 +868,16 @@ void emulator_set_options(emulator * emu, cc_bool log_enabled, cc_bool widescree
 	emu->clownmdemu.vdp.configuration.widescreen_tiles = widescreen_enabled == cc_true ? VDP_MAX_WIDESCREEN_TILES : 0;
 }
 
-void emulator_reset(emulator * emu)
+void emulator_reset(emulator * emu, cc_bool hard)
 {
-	ClownMDEmu_SoftReset(&emu->clownmdemu, !emu->cd_boot, emu->cd_boot);
+	if (hard)
+	{
+		ClownMDEmu_HardReset(&emu->clownmdemu, !emu->cd_boot, emu->cd_boot);
+	}
+	else
+	{
+		ClownMDEmu_SoftReset(&emu->clownmdemu, !emu->cd_boot, emu->cd_boot);
+	}
 	/*printf("sram: size %ld nv %d data_size %d type %d map_in %d\n",
 		emu->clownmdemu.state.external_ram.size,
 		emu->clownmdemu.state.external_ram.non_volatile,
@@ -970,7 +977,6 @@ int emulator_load_cartridge(emulator * emu, const char * filename)
 	file = strdup(filename);
 	emu->cartridge_filename = strdup(basename(file));
 	free(file);
-	ClownMDEmu_HardReset(&emu->clownmdemu, !emu->cd_boot, emu->cd_boot);
 	emulator_load_sram(emu);
 	return 1;
 }
@@ -1512,7 +1518,7 @@ int main(int argc, char ** argv)
 #endif
 #endif
 	
-	emulator_reset(emu);
+	emulator_reset(emu, cc_true);
 	
 	ns_desired = BILLION / (emu->clownmdemu.configuration.tv_standard == CLOWNMDEMU_TV_STANDARD_NTSC ? 60.0f : 50.0f);
 	running = 1;
@@ -1552,7 +1558,7 @@ int main(int argc, char ** argv)
 							running = 0;
 							break;
 						case XK_Tab:
-							emulator_reset(emu);
+							emulator_reset(emu, cc_false);
 							break;
 						default:
 							emulator_key(emu, keysym, cc_true);
