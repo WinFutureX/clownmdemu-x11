@@ -865,12 +865,12 @@ void emulator_set_region(emulator * emu, region force_region)
 void emulator_set_options(emulator * emu, cc_bool log_enabled, cc_bool widescreen_enabled)
 {
 	emu->log_enabled = log_enabled;
-	emu->clownmdemu.vdp.configuration.widescreen_tile_pairs = widescreen_enabled == cc_true ? VDP_MAX_WIDESCREEN_TILE_PAIRS : 0;
+	emu->clownmdemu.vdp.configuration.widescreen_tiles = widescreen_enabled == cc_true ? VDP_MAX_WIDESCREEN_TILES : 0;
 }
 
 void emulator_reset(emulator * emu)
 {
-	ClownMDEmu_Reset(&emu->clownmdemu, !emu->cd_boot, emu->cd_boot);
+	ClownMDEmu_SoftReset(&emu->clownmdemu, !emu->cd_boot, emu->cd_boot);
 	/*printf("sram: size %ld nv %d data_size %d type %d map_in %d\n",
 		emu->clownmdemu.state.external_ram.size,
 		emu->clownmdemu.state.external_ram.non_volatile,
@@ -970,6 +970,7 @@ int emulator_load_cartridge(emulator * emu, const char * filename)
 	file = strdup(filename);
 	emu->cartridge_filename = strdup(basename(file));
 	free(file);
+	ClownMDEmu_HardReset(&emu->clownmdemu, !emu->cd_boot, emu->cd_boot);
 	emulator_load_sram(emu);
 	return 1;
 }
