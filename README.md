@@ -39,6 +39,7 @@ Additional options:
 - `-r (J|U|E)` - force region to Japan, US or Europe respectively
 - `-l` - enables emulator core logging, useful for reporting KDebug logs or core errors
 - `-w` - enables widescreen hack
+- `-s FILE` - loads save state from specified file
 
 ## Controls
 

@@ -122,6 +122,7 @@ typedef struct emulator
 	FILE * bram;
 	char * cartridge_filename;
 	char * cd_filename;
+	cc_bool cartridge_has_save_ram;
 } emulator;
 
 /* prototypes for misc functions */
@@ -138,7 +139,7 @@ int emulator_load_cd(emulator * emu, const char * filename);
 void emulator_unload_cd(emulator * emu);
 void emulator_load_sram(emulator * emu);
 void emulator_save_sram(emulator * emu);
-void emulator_load_state(emulator * emu);
+void emulator_load_state(emulator * emu, const char * filename);
 void emulator_save_state(emulator * emu);
 void emulator_key(emulator * emu, int keysym, cc_bool down);
 void emulator_shutdown_audio(emulator * emu);
@@ -162,7 +163,8 @@ void usage(const char * app_name)
 		"        -h, -?     Print this help text\n"
 		"        -r (U|J|E) Set region to US, Japan or Europe respectively\n"
 		"        -l         Enable emulator core log output (disabled by default)\n"
-		"        -w         Enable widescreen hack (disabled by default)\n",
+		"        -w         Enable widescreen hack (disabled by default)\n"
+		"        -s FILE    Load save state from specified file\n",
 		app_name
 	);
 }
@@ -873,6 +875,7 @@ void emulator_reset(emulator * emu, cc_bool hard)
 	if (hard)
 	{
 		ClownMDEmu_HardReset(&emu->clownmdemu, !emu->cd_boot, emu->cd_boot);
+		emu->cartridge_has_save_ram = emu->clownmdemu.state.external_ram.non_volatile == cc_true ? cc_true : cc_false;
 	}
 	else
 	{
@@ -1071,7 +1074,7 @@ void emulator_save_sram(emulator * emu)
 	char * path;
 	char * comb;
 	char * strip;
-	if (emu->clownmdemu.state.external_ram.non_volatile == cc_false || emu->clownmdemu.state.external_ram.size == 0)
+	if (emu->cartridge_has_save_ram == cc_false || emu->clownmdemu.state.external_ram.size == 0)
 	{
 		return;
 	}
@@ -1096,7 +1099,7 @@ void emulator_save_sram(emulator * emu)
 	free(strip);
 }
 
-void emulator_load_state(emulator * emu)
+void emulator_load_state(emulator * emu, const char * filename)
 {
 	char tmp[8];
 	FILE * f;
@@ -1104,9 +1107,17 @@ void emulator_load_state(emulator * emu)
 	char * comb;
 	char * strip;
 	size_t read;
-	strip = strip_ext(emu->cartridge_filename ? emu->cartridge_filename : emu->cd_filename);
-	comb = append_ext(strip, "state");
-	path = build_file_path(exe_dir, comb);
+	if (!filename)
+	{
+		strip = strip_ext(emu->cartridge_filename ? emu->cartridge_filename : emu->cd_filename);
+		comb = append_ext(strip, "state");
+		path = build_file_path(exe_dir, comb);
+	}
+	else
+	{
+		strip = comb = NULL;
+		path = strdup(filename);
+	}
 	if (path)
 	{
 		if (file_size(path) != (long) save_state_size)
@@ -1275,6 +1286,7 @@ int main(int argc, char ** argv)
 	int height;
 	int region;
 	const char * filename;
+	const char * state_file;
 	int i;
 	int running;
 	
@@ -1312,6 +1324,7 @@ int main(int argc, char ** argv)
 	widescreen_enabled = cc_false;
 	region = REGION_UNSPECIFIED;
 	filename = NULL;
+	state_file = NULL;
 	
 	/*
 	 * parse args
@@ -1369,6 +1382,26 @@ int main(int argc, char ** argv)
 				case 'w':
 					widescreen_enabled = cc_true;
 					break;
+				case 's':
+					if (i == argc - 1)
+					{
+						printf("unexpected end of args\n");
+						return ret;
+					}
+					else
+					{
+						i++;
+						if (!state_file)
+						{
+							state_file = argv[i];
+						}
+						else
+						{
+							printf("specify only 1 state file\n");
+							return ret;
+						}
+					}
+					break;
 				default:
 					printf("unknown flag %s\n", argv[i]);
 					usage(argv[0]);
@@ -1392,7 +1425,7 @@ int main(int argc, char ** argv)
 	
 	if (!filename)
 	{
-		printf("no filename specified\n");
+		printf("no bootable media filename specified\n");
 		return ret;
 	}
 	
@@ -1519,6 +1552,10 @@ int main(int argc, char ** argv)
 #endif
 	
 	emulator_reset(emu, cc_true);
+	if (state_file)
+	{
+		emulator_load_state(emu, state_file);
+	}
 	
 	ns_desired = BILLION / (emu->clownmdemu.configuration.tv_standard == CLOWNMDEMU_TV_STANDARD_NTSC ? 60.0f : 50.0f);
 	running = 1;
@@ -1574,7 +1611,7 @@ int main(int argc, char ** argv)
 							emulator_save_state(emu);
 							break;
 						case XK_F8:
-							emulator_load_state(emu);
+							emulator_load_state(emu, NULL);
 							break;
 						default:
 							emulator_key(emu, keysym, cc_false);
