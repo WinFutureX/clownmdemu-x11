@@ -875,7 +875,7 @@ void emulator_reset(emulator * emu, cc_bool hard)
 	if (hard)
 	{
 		ClownMDEmu_HardReset(&emu->clownmdemu, !emu->cd_boot, emu->cd_boot);
-		emu->cartridge_has_save_ram = emu->clownmdemu.state.external_ram.non_volatile == cc_true ? cc_true : cc_false;
+		emu->cartridge_has_save_ram = emu->clownmdemu.state.external_ram.non_volatile;
 	}
 	else
 	{
