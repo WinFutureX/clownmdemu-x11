@@ -27,7 +27,8 @@ else
 OPT_CFLAGS := -O2
 endif
 
-CFLAGS := -std=c89 -pedantic $(OPT_CFLAGS) $(X11_CFLAGS) $(AUDIO_CFLAGS)
+#CFLAGS := -std=c89 -pedantic $(OPT_CFLAGS) $(X11_CFLAGS) $(AUDIO_CFLAGS)
+CFLAGS := $(OPT_CFLAGS) $(X11_CFLAGS) $(AUDIO_CFLAGS)
 LDFLAGS := -lm $(X11_LDFLAGS) $(AUDIO_LDFLAGS)
 
 ifeq ($(STRICT), $(filter $(STRICT), 1 y))
