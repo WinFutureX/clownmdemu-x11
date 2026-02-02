@@ -6,4 +6,8 @@
 #undef __unix__
 #endif
 
+#ifdef __GNUC__
+#pragma GCC diagnostic ignored "-Wunused-function"
+#endif
+
 #include "common/unity.c"

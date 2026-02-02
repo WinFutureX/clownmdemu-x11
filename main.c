@@ -58,6 +58,10 @@
 #include <X11/Xatom.h>
 #include <X11/XKBlib.h>
 
+#ifdef __GNUC__
+#pragma GCC diagnostic ignored "-Wunused-function"
+#endif
+
 #define MIXER_IMPLEMENTATION
 #include "common/core/clownmdemu.h"
 #include "common/cd-reader.h"

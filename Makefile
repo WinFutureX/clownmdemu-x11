@@ -32,7 +32,7 @@ CFLAGS := $(OPT_CFLAGS) $(X11_CFLAGS) $(AUDIO_CFLAGS)
 LDFLAGS := -lm $(X11_LDFLAGS) $(AUDIO_LDFLAGS)
 
 ifeq ($(STRICT), $(filter $(STRICT), 1 y))
-CFLAGS += -Wall -Wextra -Wno-unused-function
+CFLAGS += -Wall -Wextra
 endif
 
 ifeq ($(ASAN), $(filter $(ASAN), 1, y))
