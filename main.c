@@ -44,8 +44,6 @@
 
 #ifndef DISABLE_AUDIO
 #if defined(__linux__)
-/* inline not available in c89, so stub it out */
-#define inline
 #include <pulse/simple.h>
 #include <pulse/error.h>
 #elif defined(__OpenBSD__)
