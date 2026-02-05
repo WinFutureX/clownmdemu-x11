@@ -1,4 +1,5 @@
 .SUFFIXES: .c .o
+.PHONY: all clean
 
 DEBUG ?= 0
 DISABLE_AUDIO ?= 0
@@ -39,6 +40,8 @@ CFLAGS += -fsanitize=address
 endif
 
 OBJS = main.o common.o
+
+all: clownmdemu
 
 clownmdemu: $(OBJS)
 	$(CC) $(CFLAGS) $(OBJS) $(LDFLAGS) -o $@
