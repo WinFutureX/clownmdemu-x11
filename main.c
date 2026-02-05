@@ -1313,6 +1313,7 @@ int main(int argc, char ** argv)
 #elif defined(__OpenBSD__)
 	struct sio_hdl * audio_device;
 	struct sio_par audio_params;
+	cc_bool audio_init;
 #endif
 #endif
 	ret = 1;
@@ -1515,7 +1516,7 @@ int main(int argc, char ** argv)
 	emulator_set_region(emu, region);
 	emulator_init_audio(emu);
 	
-	#ifndef DISABLE_AUDIO
+#ifndef DISABLE_AUDIO
 	/* init audio */
 #if defined(__linux__)
 	audio_params.format = PA_SAMPLE_S16LE;
@@ -1525,14 +1526,14 @@ int main(int argc, char ** argv)
 	if (!audio_device)
 	{
 		printf("unable to create audio device: %s\n", pa_strerror(audio_error));
-		goto cleanup_x11_window;
 	}
 #elif defined(__OpenBSD__)
+	audio_init = cc_false;
 	audio_device = sio_open(SIO_DEVANY, SIO_PLAY, 0);
 	if (!audio_device)
 	{
 		printf("unable to open audio device\n");
-		goto cleanup_x11_window;
+		goto skip_audio_init;
 	}
 	sio_initpar(&audio_params);
 	audio_params.bits = 16;
@@ -1544,13 +1545,17 @@ int main(int argc, char ** argv)
 	if (!sio_setpar(audio_device, &audio_params))
 	{
 		printf("unable to set audio properties\n");
-		goto cleanup_x11_window;
+		goto skip_audio_init;
 	}
 	if (!sio_start(audio_device))
 	{
 		printf("unable to start audio device\n");
-		goto cleanup_x11_window;
 	}
+	else
+	{
+		audio_init = cc_true;
+	}
+skip_audio_init:
 #endif
 #endif
 	
@@ -1639,9 +1644,15 @@ int main(int argc, char ** argv)
 		
 #ifndef DISABLE_AUDIO
 #if defined(__linux__)
-		pa_simple_write(audio_device, emu->samples, emu->audio_bytes, &audio_error);
+		if (audio_device)
+		{
+			pa_simple_write(audio_device, emu->samples, emu->audio_bytes, &audio_error);
+		}
 #elif defined(__OpenBSD__)
-		sio_write(audio_device, emu->samples, emu->audio_bytes);
+		if (audio_init)
+		{
+			sio_write(audio_device, emu->samples, emu->audio_bytes);
+		}
 #endif
 #endif
 		
