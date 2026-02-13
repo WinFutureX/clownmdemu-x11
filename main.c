@@ -120,6 +120,7 @@ typedef struct emulator
 	cc_bool buttons[2][CLOWNMDEMU_BUTTON_MAX];
 	cc_u16l * rom_buf;
 	char rom_regions[4]; /* includes '\0' at end */
+	char cd_regions[4]; /* same thing */
 	cc_bool log_enabled;
 	
 	FILE * bram;
@@ -817,36 +818,30 @@ void emulator_set_region(emulator * emu, region force_region)
 	region detect_region = force_region;
 	if (detect_region == REGION_UNSPECIFIED)
 	{
-		if (!emu->cd_boot)
+		if (emu->cd_boot || emu->rom_size >= 0x1F3)
 		{
-			if (emu->rom_size >= 0x1F3)
+			char * region_list = emu->cd_boot ? emu->cd_regions : emu->rom_regions;
+			/* in order: us, japan then europe, otherwise fail */
+			if (strchr(region_list, 'U'))
 			{
-				/* in order: us, japan then europe, otherwise fail */
-				if (strchr(emu->rom_regions, 'U'))
-				{
-					detect_region = REGION_US;
-				}
-				else if (strchr(emu->rom_regions, 'J'))
-				{
-					detect_region = REGION_JP;
-				}
-				else if (strchr(emu->rom_regions, 'E'))
-				{
-					detect_region = REGION_EU;
-				}
-				else
-				{
-					warn("unable to autodetect region, defaulting to us\n");
-				}
+				detect_region = REGION_US;
+			}
+			else if (strchr(region_list, 'J'))
+			{
+				detect_region = REGION_JP;
+			}
+			else if (strchr(region_list, 'E'))
+			{
+				detect_region = REGION_EU;
 			}
 			else
 			{
-				warn("rom too small to include region header info, defaulting to us\n");
+				warn("unable to autodetect region, defaulting to us\n");
 			}
 		}
 		else
-		{
-			warn("region autodetection not implemented for cd mode\n");
+		{	
+			warn("rom too small to include region header info, defaulting to us\n");
 		}
 	}
 	switch (detect_region)
@@ -967,6 +962,7 @@ int emulator_load_cartridge(emulator * emu, const char * filename)
 	if (emu->rom_size >= 0x1F3)
 	{
 		memcpy(emu->rom_regions, &tmp[0x1F0 / sizeof(cc_u16l)], 3);
+		emu->rom_regions[3] = 0;
 	}
 	/* byteswap the rom so the emulator core can read it */
 	for (i = 0; i < alloc_size / sizeof(cc_u16l); i++)
@@ -1006,12 +1002,22 @@ void emulator_unload_cartridge(emulator * emu)
 int emulator_load_cd(emulator * emu, const char * filename)
 {
 	char * tmp;
+	unsigned char mcd_header[CDREADER_SECTOR_SIZE];
 	CDReader_Open(&emu->cd, NULL, filename, &emu->cd_callbacks);
 	if (!CDReader_IsOpen(&emu->cd))
 	{
 		return 0;
 	}
 	CDReader_SeekToSector(&emu->cd, 0);
+	if (CDReader_ReadMegaCDHeaderSector(&emu->cd, mcd_header))
+	{
+		memcpy(emu->cd_regions, &mcd_header[0x1F0], 3);
+		emu->cd_regions[3] = 0;
+	}
+	else
+	{
+		memset(emu->cd_regions, 0, sizeof(emu->cd_regions));
+	}
 	tmp = strdup(filename);
 	if (tmp)
 	{
