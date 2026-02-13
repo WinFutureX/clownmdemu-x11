@@ -821,7 +821,10 @@ void emulator_set_region(emulator * emu, region force_region)
 		if (emu->cd_boot || emu->rom_size >= 0x1F3)
 		{
 			char * region_list = emu->cd_boot ? emu->cd_regions : emu->rom_regions;
-			/* in order: us, japan then europe, otherwise fail */
+			/*
+			 * in order: us, japan then europe, otherwise fail
+			 * first we try the old style
+			 */
 			if (strchr(region_list, 'U'))
 			{
 				detect_region = REGION_US;
@@ -836,7 +839,36 @@ void emulator_set_region(emulator * emu, region force_region)
 			}
 			else
 			{
-				warn("unable to autodetect region, defaulting to us\n");
+				/*
+				 * new style
+				 * https://plutiedev.com/rom_header
+				 */
+				switch (region_list[0])
+				{
+					case '4':
+					case '5':
+					case '6':
+					case '7':
+					case 'C':
+					case 'D':
+					/* case 'E' already covered by old style checker */
+					case 'F':
+						detect_region = REGION_US;
+						break;
+					case '1':
+					case '3':
+					case '9':
+					case 'B':
+						detect_region = REGION_JP;
+						break;
+					case '8':
+					case 'A':
+						detect_region = REGION_EU;
+						break;
+					default:
+						warn("unable to autodetect region, defaulting to us\n");
+						break;
+				}
 			}
 		}
 		else
