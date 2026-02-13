@@ -1569,14 +1569,14 @@ int main(int argc, char ** argv)
 	audio_device = pa_simple_new(NULL, argv[0], PA_STREAM_PLAYBACK, NULL, "audio", &audio_params, NULL, NULL, &audio_error);
 	if (!audio_device)
 	{
-		printf("unable to create audio device: %s\n", pa_strerror(audio_error));
+		warn("unable to create audio device: %s\n", pa_strerror(audio_error));
 	}
 #elif defined(__OpenBSD__)
 	audio_init = cc_false;
 	audio_device = sio_open(SIO_DEVANY, SIO_PLAY, 0);
 	if (!audio_device)
 	{
-		printf("unable to open audio device\n");
+		warn("unable to open audio device\n");
 		goto skip_audio_init;
 	}
 	sio_initpar(&audio_params);
@@ -1588,12 +1588,12 @@ int main(int argc, char ** argv)
 	audio_params.xrun = SIO_IGNORE;
 	if (!sio_setpar(audio_device, &audio_params))
 	{
-		printf("unable to set audio properties\n");
+		warn("unable to set audio properties\n");
 		goto skip_audio_init;
 	}
 	if (!sio_start(audio_device))
 	{
-		printf("unable to start audio device\n");
+		warn("unable to start audio device\n");
 	}
 	else
 	{
