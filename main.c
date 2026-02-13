@@ -1129,44 +1129,50 @@ void emulator_load_state(emulator * emu, const char * filename)
 	}
 	if (path)
 	{
-		if (file_size(path) != (long) save_state_size)
+		if (file_exists(path))
 		{
-			printf("state file size mismatch, got %ld bytes, expected %lu\n", file_size(path), save_state_size);
-		}
-		else
-		{
-			f = file_open(path);
-			if (!f)
+			if (file_size(path) != (long) save_state_size)
 			{
-				printf("unable to load state file %s\n", path);
+				printf("state file size mismatch, got %ld bytes, expected %lu\n", file_size(path), save_state_size);
 			}
 			else
 			{
-				read = fread(tmp, 1, sizeof(save_state_magic), f);
-				if (read < sizeof(save_state_magic) || strcmp(save_state_magic, tmp) != 0)
+				f = file_open(path);
+				if (!f)
 				{
-					printf("state file signature invalid\n");
+					printf("unable to load state file %s\n", path);
 				}
 				else
 				{
-					read += fread(&emu->state_backup, 1, sizeof(ClownMDEmu_StateBackup), f);
-					read += fread(&emu->cd_backup, 1, sizeof(CDReader_StateBackup), f);
-					read += fread(emu->colors_backup, 1, sizeof(palette), f);
-					if (read != save_state_size)
+					read = fread(tmp, 1, sizeof(save_state_magic), f);
+					if (read < sizeof(save_state_magic) || strcmp(save_state_magic, tmp) != 0)
 					{
-						printf("state read error, got %lu bytes, expected %lu\n", read, save_state_size);
+						printf("state file signature invalid\n");
 					}
 					else
 					{
-						ClownMDEmu_LoadState(&emu->clownmdemu, &emu->state_backup);
-						CDReader_LoadState(&emu->cd, &emu->cd_backup);
-						memcpy(emu->colors, emu->colors_backup, sizeof(emu->colors_backup));
-						printf("state loaded successfully from %s\n", path);
+						read += fread(&emu->state_backup, 1, sizeof(ClownMDEmu_StateBackup), f);
+						read += fread(&emu->cd_backup, 1, sizeof(CDReader_StateBackup), f);
+						read += fread(emu->colors_backup, 1, sizeof(palette), f);
+						if (read != save_state_size)
+						{
+							printf("state read error, got %lu bytes, expected %lu\n", read, save_state_size);
+						}
+						else
+						{
+							ClownMDEmu_LoadState(&emu->clownmdemu, &emu->state_backup);
+							CDReader_LoadState(&emu->cd, &emu->cd_backup);
+							memcpy(emu->colors, emu->colors_backup, sizeof(emu->colors_backup));
+							printf("state loaded successfully from %s\n", path);
+						}
 					}
+					file_close(f);
 				}
-				file_close(f);
 			}
-			
+		}
+		else
+		{
+			printf("state file %s does not exist\n", path);
 		}
 	}
 	free(path);
