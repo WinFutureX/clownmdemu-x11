@@ -1716,11 +1716,17 @@ skip_audio_init:
 	ret = 0;
 #ifndef DISABLE_AUDIO
 #if defined(__linux__)
-	pa_simple_drain(audio_device, &audio_error);
-	pa_simple_free(audio_device);
+	if (audio_device)
+	{
+		pa_simple_drain(audio_device, &audio_error);
+		pa_simple_free(audio_device);
+	}
 #elif defined(__OpenBSD__)
-	sio_stop(audio_device);
-	sio_close(audio_device);
+	if (audio_init)
+	{
+		sio_stop(audio_device);
+		sio_close(audio_device);
+	}
 #endif
 #endif
 cleanup_x11_window:
