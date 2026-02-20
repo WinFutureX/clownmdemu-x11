@@ -7,7 +7,7 @@
 #endif
 
 #ifdef __GNUC__
-/* to shut up "unused function" warnings from dr_flac, dr_mp3, dr_wav and libchdr */
+/* to shut up "unused function" warnings from libchdr */
 #pragma GCC diagnostic ignored "-Wunused-function"
 #endif
 
