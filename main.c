@@ -56,11 +56,6 @@
 #include <X11/Xatom.h>
 #include <X11/XKBlib.h>
 
-#ifdef __GNUC__
-/* to shut up "unused function" warnings from dr_flac, dr_mp3, dr_wav and libchdr */
-#pragma GCC diagnostic ignored "-Wunused-function"
-#endif
-
 #define MIXER_IMPLEMENTATION
 #include "common/core/clownmdemu.h"
 #include "common/cd-reader.h"
