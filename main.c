@@ -251,6 +251,16 @@ int exe_dir_init(char * argv0, char * result, size_t result_size)
 	return 0;
 }
 
+const char * get_exe_dir(void)
+{
+	return exe_dir;
+}
+
+char * get_basename(char * path)
+{
+	return strdup(basename(path));
+}
+
 char * build_file_path(const char * path, const char * filename)
 {
 	int ret_size;
@@ -357,43 +367,92 @@ int file_is_file(const char * filename)
 	return S_ISREG(attr.st_mode);
 }
 
-FILE * file_open(const char * filename)
+FILE * file_open_read(const char * filename)
 {
-	FILE * f;
 	if (!file_is_file(filename))
 	{
 		return NULL;
 	}
-	f = fopen(filename, "rb");
-	if (!f)
+	return fopen(filename, "rb");
+}
+
+FILE * file_open_write(const char * filename)
+{
+	if (!file_is_file(filename))
 	{
 		return NULL;
 	}
-	return f;
+	return fopen(filename, "wb");
 }
 
-void file_close(FILE * f)
+FILE * file_truncate(const char * filename)
 {
-	if (f)
+	if (file_exists(filename) && !file_is_file(filename))
 	{
-		fclose(f);
+		return NULL;
 	}
+	return fopen(filename, "w+b");
+}
+
+int file_close(FILE * stream)
+{
+	if (!stream)
+	{
+		return EOF;
+	}
+	return fclose(stream);
+}
+
+size_t file_read(void * dst, size_t bytes, FILE * stream)
+{
+	if (!dst || !stream || bytes < 1)
+	{
+		return 0;
+	}
+	return fread(dst, 1, bytes, stream);
+}
+
+size_t file_write(const void * src, size_t bytes, FILE * stream)
+{
+	if (!src || !stream || bytes < 1)
+	{
+		return 0;
+	}
+	return fwrite(src, 1, bytes, stream);
+}
+
+int file_seek(FILE * stream, long offset, int whence)
+{
+	if (!stream)
+	{
+		return 0;
+	}
+	return fseek(stream, offset, whence) == 0 ? 1 : 0;
+}
+
+long file_tell(FILE * stream)
+{
+	if (!stream)
+	{
+		return -1;
+	}
+	return ftell(stream);
 }
 
 long file_size(const char * filename)
 {
 	FILE * f;
 	size_t size;
-	f = file_open(filename);
+	f = file_open_read(filename);
 	if (!f)
 	{
 		return -1;
 	}
-	if (fseek(f, 0, SEEK_END) != 0)
+	if (!file_seek(f, 0, SEEK_END))
 	{
 		return -1;
 	}
-	size = ftell(f);
+	size = file_tell(f);
 	file_close(f);
 	return size;
 }
@@ -410,15 +469,15 @@ int file_load_to_buffer(const char * filename, unsigned char ** out_buf, size_t 
 		return ret;
 	}
 	buf_size = size % 2 == 1 ? size + 1 : size;
-	f = file_open(filename);
+	f = file_open_read(filename);
 	if (f)
 	{
 		unsigned char * buf = (unsigned char *) malloc(buf_size);
 		if (buf)
 		{
-			if (fseek(f, 0, SEEK_SET) == 0)
+			if (file_seek(f, 0, SEEK_SET))
 			{
-				if (fread(buf, 1, (size_t) size, f) == (size_t) size)
+				if (file_read(buf, (size_t) size, f) == (size_t) size)
 				{
 					*out_buf = buf;
 					*out_size = size;
@@ -537,12 +596,12 @@ size_t emulator_callback_cd_audio_read(void * data, cc_s16l * buf, size_t frames
 cc_bool emulator_callback_save_file_open_read(void * data, const char * filename)
 {
 	emulator * e = (emulator *) data;
-	char * file_path = build_file_path(exe_dir, filename);
+	char * file_path = build_file_path(get_exe_dir(), filename);
 	if (!file_path)
 	{
 		return cc_false;
 	}
-	e->bram = fopen(file_path, "r+b");
+	e->bram = file_open_read(file_path);
 	free(file_path);
 	return e->bram ? cc_true : cc_false;
 }
@@ -550,26 +609,26 @@ cc_bool emulator_callback_save_file_open_read(void * data, const char * filename
 cc_s16f emulator_callback_save_file_read(void * data)
 {
 	emulator * e = (emulator *) data;
-	uint8_t byte;
+	unsigned char byte;
 	if (!e->bram)
 	{
 		return -1;
 	}
 	else
 	{
-		return fread(&byte, 1, 1, e->bram) < 1 ? -1 : byte;
+		return file_read(&byte, sizeof(byte), e->bram) < sizeof(byte) ? -1 : byte;
 	}
 }
 
 cc_bool emulator_callback_save_file_open_write(void * data, const char * filename)
 {
 	emulator * e = (emulator *) data;
-	char * file_path = build_file_path(exe_dir, filename);
+	char * file_path = build_file_path(get_exe_dir(), filename);
 	if (!file_path)
 	{
 		return cc_false;
 	}
-	e->bram = fopen(file_path, "w+b");
+	e->bram = file_truncate(file_path);
 	free(file_path);
 	return e->bram ? cc_true : cc_false;
 }
@@ -579,7 +638,7 @@ void emulator_callback_save_file_write(void * data, cc_u8f val)
 	emulator * e = (emulator *) data;
 	if (e->bram)
 	{
-		fwrite(&val, 1, 1, e->bram);
+		file_write(&val, sizeof(unsigned char), e->bram);
 	}
 }
 
@@ -588,7 +647,7 @@ void emulator_callback_save_file_close(void * data)
 	emulator * e = (emulator *) data;
 	if (e->bram)
 	{
-		fclose(e->bram);
+		file_close(e->bram);
 	}
 }
 
@@ -610,18 +669,19 @@ cc_bool emulator_callback_save_file_size_obtain(void * data, const char * filena
 {
 	emulator * e = (emulator *) data;
 	int file_size = 0;
-	char * file_path = build_file_path(exe_dir, filename);
+	char * file_path = build_file_path(get_exe_dir(), filename);
 	if (!file_path)
 	{
 		return cc_false;
 	}
-	e->bram = fopen(file_path, "rb");
+	e->bram = file_open_read(file_path);
 	free(file_path);
 	if (e->bram)
 	{
-		fseek(e->bram, 0, SEEK_END);
-		file_size = ftell(e->bram);
-		fclose(e->bram);
+		file_seek(e->bram, 0, SEEK_END);
+		file_size = file_tell(e->bram);
+		file_close(e->bram);
+		e->bram = NULL;
 		if (file_size > 0)
 		{
 			*size = file_size;
@@ -643,65 +703,48 @@ void emulator_callback_log(void * data, const char * fmt, va_list args)
 
 void * emulator_callback_clowncd_open(const char * filename, ClownCD_FileMode mode)
 {
-	const char * open_mode;
 	switch (mode)
 	{
 		case CLOWNCD_RB:
-			open_mode = "rb";
+			return file_open_read(filename);
 			break;
 		case CLOWNCD_WB:
-			open_mode = "wb";
+			return file_open_write(filename);
 			break;
 		default:
-			open_mode = NULL;
+			return NULL;
 			break;
 	}
-	
-	return open_mode ? fopen(filename, open_mode) : NULL;
 }
 
 int emulator_callback_clowncd_close(void * stream)
 {
-	return fclose((FILE *) stream);
+	return file_close((FILE *) stream);
 }
 
 size_t emulator_callback_clowncd_read(void * buf, size_t size, size_t count, void * stream)
 {
-	int64_t bytes;
 	if (size == 0 || count == 0)
 	{
 		return 0;
 	}
 	
-	bytes = fread(buf, size, count, (FILE *) stream);
-	if (bytes < 0 || (uint64_t) bytes > (size_t) -1)
-	{
-		return 0;
-	}
-	
-	return bytes;
+	return file_read(buf, size * count, (FILE *) stream);
 }
 
 size_t emulator_callback_clowncd_write(const void * buf, size_t size, size_t count, void * stream)
 {
-	int64_t bytes;
 	if (size == 0 || count == 0)
 	{
 		return 0;
 	}
 	
-	bytes = fwrite(buf, size, count, (FILE *) stream);
-	if (bytes < 0 || (uint64_t) bytes > (size_t) -1)
-	{
-		return 0;
-	}
-	
-	return bytes;
+	return file_write(buf, size * count, (FILE *) stream);
 }
 
 long emulator_callback_clowncd_tell(void * stream)
 {
-	const int64_t pos = ftell((FILE *) stream);
+	const long pos = file_tell((FILE *) stream);
 	if (pos < 0 || pos > LONG_MAX)
 	{
 		return -1;
@@ -728,7 +771,7 @@ int emulator_callback_clowncd_seek(void * stream, long pos, ClownCD_FileOrigin o
 			return -1;
 	}
 	
-	return fseek((FILE *) stream, pos, seek_origin) != 0 ? -1 : 0;
+	return file_seek((FILE *) stream, pos, seek_origin) ? -1 : 0;
 }
 
 void emulator_callback_clowncd_log(void * data, const char * msg)
@@ -1004,7 +1047,7 @@ int emulator_load_cartridge(emulator * emu, const char * filename)
 	ClownMDEmu_SetCartridge(&emu->clownmdemu, emu->rom_buf, emu->rom_size);
 	printf("booting cartridge, loaded %ld bytes\n", size);
 	file = strdup(filename);
-	emu->cartridge_filename = strdup(basename(file));
+	emu->cartridge_filename = get_basename(file);
 	free(file);
 	emulator_load_sram(emu);
 	return 1;
@@ -1048,7 +1091,7 @@ int emulator_load_cd(emulator * emu, const char * filename)
 	tmp = strdup(filename);
 	if (tmp)
 	{
-		emu->cd_filename = strdup(basename(tmp));
+		emu->cd_filename = get_basename(tmp);
 		free(tmp);
 	}
 	return 1;
@@ -1076,10 +1119,10 @@ void emulator_load_sram(emulator * emu)
 	cc_u8l * tmp;
 	strip = strip_ext(emu->cartridge_filename);
 	comb = append_ext(strip, "srm");
-	path = build_file_path(exe_dir, comb);
+	path = build_file_path(get_exe_dir(), comb);
 	if (path)
 	{
-		if (access(path, F_OK) == 0)
+		if (file_exists(path))
 		{
 			size = file_size(path);
 			if (size > sizeof(emu->clownmdemu.state.external_ram.buffer))
@@ -1116,15 +1159,15 @@ void emulator_save_sram(emulator * emu)
 	}
 	strip = strip_ext(emu->cartridge_filename);
 	comb = append_ext(strip, "srm");
-	path = build_file_path(exe_dir, comb);
+	path = build_file_path(get_exe_dir(), comb);
 	if (path)
 	{
-		f = fopen(path, "w+b");
+		f = file_truncate(path);
 	}
 	if (f)
 	{
-		fwrite(emu->clownmdemu.state.external_ram.buffer, sizeof(emu->clownmdemu.state.external_ram.buffer[0]), emu->clownmdemu.state.external_ram.size, f);
-		fclose(f);
+		file_write(emu->clownmdemu.state.external_ram.buffer, emu->clownmdemu.state.external_ram.size, f);
+		file_close(f);
 	}
 	else
 	{
@@ -1147,7 +1190,7 @@ void emulator_load_state(emulator * emu, const char * filename)
 	{
 		strip = strip_ext(emu->cartridge_filename ? emu->cartridge_filename : emu->cd_filename);
 		comb = append_ext(strip, "state");
-		path = build_file_path(exe_dir, comb);
+		path = build_file_path(get_exe_dir(), comb);
 	}
 	else
 	{
@@ -1164,23 +1207,23 @@ void emulator_load_state(emulator * emu, const char * filename)
 			}
 			else
 			{
-				f = file_open(path);
+				f = file_open_read(path);
 				if (!f)
 				{
 					printf("unable to load state file %s\n", path);
 				}
 				else
 				{
-					read = fread(tmp, 1, sizeof(save_state_magic), f);
+					read = file_read(tmp, sizeof(save_state_magic), f);
 					if (read < sizeof(save_state_magic) || strcmp(save_state_magic, tmp) != 0)
 					{
 						printf("state file signature invalid\n");
 					}
 					else
 					{
-						read += fread(&emu->state_backup, 1, sizeof(ClownMDEmu_StateBackup), f);
-						read += fread(&emu->cd_backup, 1, sizeof(CDReader_StateBackup), f);
-						read += fread(emu->colors_backup, 1, sizeof(palette), f);
+						read += file_read(&emu->state_backup, sizeof(ClownMDEmu_StateBackup), f);
+						read += file_read(&emu->cd_backup, sizeof(CDReader_StateBackup), f);
+						read += file_read(emu->colors_backup, sizeof(palette), f);
 						if (read != save_state_size)
 						{
 							printf("state read error, got %lu bytes, expected %lu\n", read, save_state_size);
@@ -1216,19 +1259,19 @@ void emulator_save_state(emulator * emu)
 	size_t written;
 	strip = strip_ext(emu->cartridge_filename ? emu->cartridge_filename : emu->cd_filename);
 	comb = append_ext(strip, "state");
-	path = build_file_path(exe_dir, comb);
+	path = build_file_path(get_exe_dir(), comb);
 	if (path)
 	{
 		ClownMDEmu_SaveState(&emu->clownmdemu, &emu->state_backup);
 		CDReader_SaveState(&emu->cd, &emu->cd_backup);
 		memcpy(emu->colors_backup, emu->colors, sizeof(emu->colors));
-		f = fopen(path, "w+b");
+		f = file_truncate(path);
 		if (f)
 		{
-			written = fwrite(save_state_magic, 1, sizeof(save_state_magic), f);
-			written += fwrite(&emu->state_backup, 1, sizeof(ClownMDEmu_StateBackup), f);
-			written += fwrite(&emu->cd_backup, 1, sizeof(CDReader_StateBackup), f);
-			written += fwrite(&emu->colors_backup, 1, sizeof(palette), f);
+			written = file_write(save_state_magic, sizeof(save_state_magic), f);
+			written += file_write(&emu->state_backup, sizeof(ClownMDEmu_StateBackup), f);
+			written += file_write(&emu->cd_backup, sizeof(CDReader_StateBackup), f);
+			written += file_write(&emu->colors_backup, sizeof(palette), f);
 			if (written != save_state_size)
 			{
 				printf("state write error, got %lu bytes, expected %lu\n", written, save_state_size);
@@ -1237,7 +1280,7 @@ void emulator_save_state(emulator * emu)
 			{
 				printf("state saved successfully to %s\n", path);
 			}
-			fclose(f);
+			file_close(f);
 		}
 		else
 		{
