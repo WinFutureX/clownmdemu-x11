@@ -385,7 +385,7 @@ FILE * file_open_write(const char * filename)
 	return fopen(filename, "wb");
 }
 
-FILE * file_truncate(const char * filename)
+FILE * file_open_truncate(const char * filename)
 {
 	if (file_exists(filename) && !file_is_file(filename))
 	{
@@ -628,7 +628,7 @@ cc_bool emulator_callback_save_file_open_write(void * data, const char * filenam
 	{
 		return cc_false;
 	}
-	e->bram = file_truncate(file_path);
+	e->bram = file_open_truncate(file_path);
 	free(file_path);
 	return e->bram ? cc_true : cc_false;
 }
@@ -1162,7 +1162,7 @@ void emulator_save_sram(emulator * emu)
 	path = build_file_path(get_exe_dir(), comb);
 	if (path)
 	{
-		f = file_truncate(path);
+		f = file_open_truncate(path);
 	}
 	if (f)
 	{
@@ -1265,7 +1265,7 @@ void emulator_save_state(emulator * emu)
 		ClownMDEmu_SaveState(&emu->clownmdemu, &emu->state_backup);
 		CDReader_SaveState(&emu->cd, &emu->cd_backup);
 		memcpy(emu->colors_backup, emu->colors, sizeof(emu->colors));
-		f = file_truncate(path);
+		f = file_open_truncate(path);
 		if (f)
 		{
 			written = file_write(save_state_magic, sizeof(save_state_magic), f);
