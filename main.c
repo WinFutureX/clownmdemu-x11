@@ -493,7 +493,7 @@ int file_load_to_buffer(const char * filename, unsigned char ** out_buf, size_t 
 }
 
 /* emulator callbacks */
-void emulator_callback_color_update(void * data, cc_u16f idx, cc_u16f color)
+static void emulator_callback_color_update(void * data, cc_u16f idx, cc_u16f color)
 {
 	emulator * e = (emulator *) data;
 	const cc_u32f r = color & 0xF;
@@ -504,7 +504,7 @@ void emulator_callback_color_update(void * data, cc_u16f idx, cc_u16f color)
 	e->colors[idx] = 0xFF000000 | (r << 20) | (r << 16) | (g << 12) | (g << 8) | (b << 4) | b;
 }
 
-void emulator_callback_scanline_render(void * data, cc_u16f scanline, const cc_u8l * pixels, cc_u16f left_boundary, cc_u16f right_boundary, cc_u16f width, cc_u16f height)
+static void emulator_callback_scanline_render(void * data, cc_u16f scanline, const cc_u8l * pixels, cc_u16f left_boundary, cc_u16f right_boundary, cc_u16f width, cc_u16f height)
 {
 	emulator * e = (emulator *) data;
 	cc_u16f i;
@@ -521,49 +521,49 @@ void emulator_callback_scanline_render(void * data, cc_u16f scanline, const cc_u
 	}
 }
 
-cc_bool emulator_callback_input_request(void * data, cc_u8f player, ClownMDEmu_Button button)
+static cc_bool emulator_callback_input_request(void * data, cc_u8f player, ClownMDEmu_Button button)
 {
 	emulator * e = (emulator *) data;
 	return e->buttons[player][button];
 }
 
-void emulator_callback_fm_generate(void * data, struct ClownMDEmu * clownmdemu, size_t frames, void (* generate_fm_audio)(struct ClownMDEmu * clownmdemu, cc_s16l * sample_buffer, size_t total_frames))
+static void emulator_callback_fm_generate(void * data, struct ClownMDEmu * clownmdemu, size_t frames, void (* generate_fm_audio)(struct ClownMDEmu * clownmdemu, cc_s16l * sample_buffer, size_t total_frames))
 {
 	emulator * e = (emulator *) data;
 	generate_fm_audio(clownmdemu, Mixer_AllocateFMSamples(&e->mixer, frames), frames);
 }
 
-void emulator_callback_psg_generate(void * data, struct ClownMDEmu * clownmdemu, size_t frames, void (* generate_psg_audio)(struct ClownMDEmu * clownmdemu, cc_s16l * sample_buffer, size_t total_samples))
+static void emulator_callback_psg_generate(void * data, struct ClownMDEmu * clownmdemu, size_t frames, void (* generate_psg_audio)(struct ClownMDEmu * clownmdemu, cc_s16l * sample_buffer, size_t total_samples))
 {
 	emulator * e = (emulator *) data;
 	generate_psg_audio(clownmdemu, Mixer_AllocatePSGSamples(&e->mixer, frames), frames);
 }
 
-void emulator_callback_pcm_generate(void * data, struct ClownMDEmu * clownmdemu, size_t frames, void (* generate_pcm_audio)(struct ClownMDEmu * clownmdemu, cc_s16l * sample_buffer, size_t total_frames))
+static void emulator_callback_pcm_generate(void * data, struct ClownMDEmu * clownmdemu, size_t frames, void (* generate_pcm_audio)(struct ClownMDEmu * clownmdemu, cc_s16l * sample_buffer, size_t total_frames))
 {
 	emulator * e = (emulator *) data;
 	generate_pcm_audio(clownmdemu, Mixer_AllocatePCMSamples(&e->mixer, frames), frames);
 }
 
-void emulator_callback_cdda_generate(void * data, struct ClownMDEmu * clownmdemu, size_t frames, void (* generate_cdda_audio)(struct ClownMDEmu * clownmdemu, cc_s16l * sample_buffer, size_t total_frames))
+static void emulator_callback_cdda_generate(void * data, struct ClownMDEmu * clownmdemu, size_t frames, void (* generate_cdda_audio)(struct ClownMDEmu * clownmdemu, cc_s16l * sample_buffer, size_t total_frames))
 {
 	emulator * e = (emulator *) data;
 	generate_cdda_audio(clownmdemu, Mixer_AllocateCDDASamples(&e->mixer, frames), frames);
 }
 
-void emulator_callback_cd_seek(void * data, cc_u32f idx)
+static void emulator_callback_cd_seek(void * data, cc_u32f idx)
 {
 	emulator * e = (emulator *) data;
 	CDReader_SeekToSector(&e->cd, idx);
 }
 
-void emulator_callback_cd_sector_read(void * data, cc_u16l * buf)
+static void emulator_callback_cd_sector_read(void * data, cc_u16l * buf)
 {
 	emulator * e = (emulator *) data;
 	CDReader_ReadSector(&e->cd, buf);
 }
 
-cc_bool emulator_callback_cd_seek_track(void * data, cc_u16f idx, ClownMDEmu_CDDAMode mode)
+static cc_bool emulator_callback_cd_seek_track(void * data, cc_u16f idx, ClownMDEmu_CDDAMode mode)
 {
 	emulator * e = (emulator *) data;
 	CDReader_PlaybackSetting playback_setting;
@@ -587,13 +587,13 @@ cc_bool emulator_callback_cd_seek_track(void * data, cc_u16f idx, ClownMDEmu_CDD
 	return CDReader_PlayAudio(&e->cd, idx, playback_setting);
 }
 
-size_t emulator_callback_cd_audio_read(void * data, cc_s16l * buf, size_t frames)
+static size_t emulator_callback_cd_audio_read(void * data, cc_s16l * buf, size_t frames)
 {
 	emulator * e = (emulator *) data;
 	return CDReader_ReadAudio(&e->cd, buf, frames);
 }
 
-cc_bool emulator_callback_save_file_open_read(void * data, const char * filename)
+static cc_bool emulator_callback_save_file_open_read(void * data, const char * filename)
 {
 	emulator * e = (emulator *) data;
 	char * file_path = build_file_path(get_exe_dir(), filename);
@@ -606,7 +606,7 @@ cc_bool emulator_callback_save_file_open_read(void * data, const char * filename
 	return e->bram ? cc_true : cc_false;
 }
 
-cc_s16f emulator_callback_save_file_read(void * data)
+static cc_s16f emulator_callback_save_file_read(void * data)
 {
 	emulator * e = (emulator *) data;
 	unsigned char byte;
@@ -620,7 +620,7 @@ cc_s16f emulator_callback_save_file_read(void * data)
 	}
 }
 
-cc_bool emulator_callback_save_file_open_write(void * data, const char * filename)
+static cc_bool emulator_callback_save_file_open_write(void * data, const char * filename)
 {
 	emulator * e = (emulator *) data;
 	char * file_path = build_file_path(get_exe_dir(), filename);
@@ -633,7 +633,7 @@ cc_bool emulator_callback_save_file_open_write(void * data, const char * filenam
 	return e->bram ? cc_true : cc_false;
 }
 
-void emulator_callback_save_file_write(void * data, cc_u8f val)
+static void emulator_callback_save_file_write(void * data, cc_u8f val)
 {
 	emulator * e = (emulator *) data;
 	if (e->bram)
@@ -642,7 +642,7 @@ void emulator_callback_save_file_write(void * data, cc_u8f val)
 	}
 }
 
-void emulator_callback_save_file_close(void * data)
+static void emulator_callback_save_file_close(void * data)
 {
 	emulator * e = (emulator *) data;
 	if (e->bram)
@@ -651,7 +651,7 @@ void emulator_callback_save_file_close(void * data)
 	}
 }
 
-cc_bool emulator_callback_save_file_remove(void * data, const char * filename)
+static cc_bool emulator_callback_save_file_remove(void * data, const char * filename)
 {
 	int status;
 	char * file_path = build_file_path(exe_dir, filename);
@@ -665,7 +665,7 @@ cc_bool emulator_callback_save_file_remove(void * data, const char * filename)
 	return status == 0 ? cc_true : cc_false;
 }
 
-cc_bool emulator_callback_save_file_size_obtain(void * data, const char * filename, size_t * size)
+static cc_bool emulator_callback_save_file_size_obtain(void * data, const char * filename, size_t * size)
 {
 	emulator * e = (emulator *) data;
 	int file_size = 0;
@@ -690,7 +690,7 @@ cc_bool emulator_callback_save_file_size_obtain(void * data, const char * filena
 	return file_size > 0 ? cc_true : cc_false;
 }
 
-void emulator_callback_log(void * data, const char * fmt, va_list args)
+static void emulator_callback_log(void * data, const char * fmt, va_list args)
 {
 	emulator * e = (emulator *) data;
 	if (e->log_enabled == cc_true)
@@ -701,7 +701,7 @@ void emulator_callback_log(void * data, const char * fmt, va_list args)
 	}
 }
 
-void * emulator_callback_clowncd_open(const char * filename, ClownCD_FileMode mode)
+static void * emulator_callback_clowncd_open(const char * filename, ClownCD_FileMode mode)
 {
 	switch (mode)
 	{
@@ -717,12 +717,12 @@ void * emulator_callback_clowncd_open(const char * filename, ClownCD_FileMode mo
 	}
 }
 
-int emulator_callback_clowncd_close(void * stream)
+static int emulator_callback_clowncd_close(void * stream)
 {
 	return file_close((FILE *) stream);
 }
 
-size_t emulator_callback_clowncd_read(void * buf, size_t size, size_t count, void * stream)
+static size_t emulator_callback_clowncd_read(void * buf, size_t size, size_t count, void * stream)
 {
 	if (size == 0 || count == 0)
 	{
@@ -732,7 +732,7 @@ size_t emulator_callback_clowncd_read(void * buf, size_t size, size_t count, voi
 	return file_read(buf, size * count, (FILE *) stream);
 }
 
-size_t emulator_callback_clowncd_write(const void * buf, size_t size, size_t count, void * stream)
+static size_t emulator_callback_clowncd_write(const void * buf, size_t size, size_t count, void * stream)
 {
 	if (size == 0 || count == 0)
 	{
@@ -742,7 +742,7 @@ size_t emulator_callback_clowncd_write(const void * buf, size_t size, size_t cou
 	return file_write(buf, size * count, (FILE *) stream);
 }
 
-long emulator_callback_clowncd_tell(void * stream)
+static long emulator_callback_clowncd_tell(void * stream)
 {
 	const long pos = file_tell((FILE *) stream);
 	if (pos < 0 || pos > LONG_MAX)
@@ -753,7 +753,7 @@ long emulator_callback_clowncd_tell(void * stream)
 	return pos;
 }
 
-int emulator_callback_clowncd_seek(void * stream, long pos, ClownCD_FileOrigin origin)
+static int emulator_callback_clowncd_seek(void * stream, long pos, ClownCD_FileOrigin origin)
 {
 	int seek_origin;
 	switch (origin)
@@ -774,7 +774,7 @@ int emulator_callback_clowncd_seek(void * stream, long pos, ClownCD_FileOrigin o
 	return file_seek((FILE *) stream, pos, seek_origin) ? -1 : 0;
 }
 
-void emulator_callback_clowncd_log(void * data, const char * msg)
+static void emulator_callback_clowncd_log(void * data, const char * msg)
 {
 	emulator * e = (emulator *) data;
 	if (e->log_enabled == cc_true)
@@ -783,7 +783,7 @@ void emulator_callback_clowncd_log(void * data, const char * msg)
 	}
 }
 
-void emulator_callback_mixer_complete(void * data, const cc_s16l * samples, size_t frames)
+static void emulator_callback_mixer_complete(void * data, const cc_s16l * samples, size_t frames)
 {
 	emulator * e = (emulator *) data;
 	size_t bytes = frames * sizeof(cc_s16l) * MIXER_CHANNEL_COUNT;
