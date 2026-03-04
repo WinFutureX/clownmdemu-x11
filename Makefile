@@ -39,7 +39,7 @@ ifeq ($(ASAN), $(filter $(ASAN), 1, y))
 CFLAGS += -fsanitize=address
 endif
 
-OBJS = main.o common.o
+OBJS = common.o emulator.o file.o main.o path.o
 
 all: clownmdemu
 
@@ -50,4 +50,4 @@ clownmdemu: $(OBJS)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -f *.o clownmdemu
+	rm -f $(OBJS) clownmdemu
