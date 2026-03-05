@@ -258,33 +258,27 @@ static int emulator_callback_clowncd_close(void * stream)
 
 static size_t emulator_callback_clowncd_read(void * buf, size_t size, size_t count, void * stream)
 {
-	if (size == 0 || count == 0)
+	/* file_read() does not work here as it breaks cd reads for some reason */
+	if (!buf || size == 0 || count == 0 || !stream)
 	{
 		return 0;
 	}
-	
-	return file_read(buf, size * count, (FILE *) stream);
+	return fread(buf, size, count, (FILE *) stream);
 }
 
 static size_t emulator_callback_clowncd_write(const void * buf, size_t size, size_t count, void * stream)
 {
-	if (size == 0 || count == 0)
+	if (!buf || size == 0 || count == 0 || !stream)
 	{
 		return 0;
 	}
 	
-	return file_write(buf, size * count, (FILE *) stream);
+	return fwrite(buf, size, count, (FILE *) stream);
 }
 
 static long emulator_callback_clowncd_tell(void * stream)
 {
-	const long pos = file_tell((FILE *) stream);
-	if (pos < 0 || pos > LONG_MAX)
-	{
-		return -1;
-	}
-	
-	return pos;
+	return file_tell((FILE *) stream);
 }
 
 static int emulator_callback_clowncd_seek(void * stream, long pos, ClownCD_FileOrigin origin)
@@ -305,7 +299,7 @@ static int emulator_callback_clowncd_seek(void * stream, long pos, ClownCD_FileO
 			return -1;
 	}
 	
-	return file_seek((FILE *) stream, pos, seek_origin) ? -1 : 0;
+	return file_seek((FILE *) stream, pos, seek_origin) ? 0 : -1;
 }
 
 static void emulator_callback_clowncd_log(void * data, const char * msg)
