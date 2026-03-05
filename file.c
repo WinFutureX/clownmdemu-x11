@@ -1,18 +1,10 @@
 #include "file.h"
 
-/* 
- * check if a file exists
- * returns true if it does, otherwise false
- */
 int file_exists(const char * filename)
 {
 	return access(filename, F_OK) == 0 ? 1 : 0;
 }
 
-/*
- * check if path refers to a file
- * returns true if it does, otherwise false
- */
 int file_is_file(const char * filename)
 {
 	struct stat attr;
@@ -23,10 +15,6 @@ int file_is_file(const char * filename)
 	return S_ISREG(attr.st_mode) ? 1 : 0;
 }
 
-/*
- * opens a file for reading
- * returns a FILE pointer on success, NULL on failure
- */
 FILE * file_open_read(const char * filename)
 {
 	if (!file_is_file(filename))
@@ -36,10 +24,6 @@ FILE * file_open_read(const char * filename)
 	return fopen(filename, "rb");
 }
 
-/*
- * opens a file for writing
- * returns a FILE pointer on success, NULL on failure
- */
 FILE * file_open_write(const char * filename)
 {
 	if (!file_is_file(filename))
@@ -49,10 +33,6 @@ FILE * file_open_write(const char * filename)
 	return fopen(filename, "wb");
 }
 
-/*
- * creates a new file if one doesn't exist, or overwrites and truncates an existing one
- * returns a FILE pointer on success, NULL on failure
- */
 FILE * file_open_truncate(const char * filename)
 {
 	if (file_exists(filename) && !file_is_file(filename))
@@ -62,10 +42,6 @@ FILE * file_open_truncate(const char * filename)
 	return fopen(filename, "w+b");
 }
 
-/*
- * closes an open file
- * returns true on success, otherwise false
- */
 int file_close(FILE * stream)
 {
 	if (!stream)
@@ -75,10 +51,6 @@ int file_close(FILE * stream)
 	return fclose(stream) == 0 ? 1 : 0;
 }
 
-/*
- * reads bytes from an open file
- * returns the number of bytes successfully read
- */
 size_t file_read(void * dst, size_t bytes, FILE * stream)
 {
 	if (!dst || !stream || bytes < 1)
@@ -88,10 +60,6 @@ size_t file_read(void * dst, size_t bytes, FILE * stream)
 	return fread(dst, 1, bytes, stream);
 }
 
-/*
- * writes bytes to an open file
- * returns the number of bytes successfully written
- */
 size_t file_write(const void * src, size_t bytes, FILE * stream)
 {
 	if (!src || !stream || bytes < 1)
@@ -101,10 +69,6 @@ size_t file_write(const void * src, size_t bytes, FILE * stream)
 	return fwrite(src, 1, bytes, stream);
 }
 
-/*
- * sets position counter of an open file
- * returns true on success, otherwise false
- */
 int file_seek(FILE * stream, long offset, int whence)
 {
 	if (!stream)
@@ -114,10 +78,6 @@ int file_seek(FILE * stream, long offset, int whence)
 	return fseek(stream, offset, whence) == 0 ? 1 : 0;
 }
 
-/*
- * gets position counter of an open file
- * returns position on success, -1 on failure
- */
 long file_tell(FILE * stream)
 {
 	if (!stream)
@@ -127,10 +87,6 @@ long file_tell(FILE * stream)
 	return ftell(stream);
 }
 
-/*
- * gets size of a file
- * returns size on success, -1 on failure
- */
 long file_size(const char * filename)
 {
 	FILE * f;
@@ -149,10 +105,6 @@ long file_size(const char * filename)
 	return size;
 }
 
-/*
- * loads a file to a buffer
- * returns true on success, otherwise false
- */
 int file_load_to_buffer(const char * filename, unsigned char ** out_buf, size_t * out_size)
 {
 	long size;
