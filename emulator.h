@@ -27,7 +27,6 @@ typedef struct emulator
 	
 	CDReader_State cd;
 	ClownCD_FileCallbacks cd_callbacks;
-	cc_bool cd_boot;
 	
 	ClownMDEmu_StateBackup state_backup;
 	CDReader_StateBackup cd_backup;
@@ -53,6 +52,8 @@ typedef struct emulator
 	char * cartridge_filename;
 	char * cd_filename;
 	cc_bool cartridge_has_save_ram;
+	cc_bool cartridge_inserted;
+	cc_bool cd_inserted;
 } emulator;
 
 void warn(const char * fmt, ...);

@@ -40,6 +40,8 @@ Additional options:
 - `-l` - enables emulator core logging, useful for reporting KDebug logs or core errors
 - `-w` - enables widescreen hack
 - `-s FILE` - loads save state from specified file
+- `-c FILE` - loads specified file as a cartridge
+- `-d FILE` - loads specified file as a disc
 
 ## Controls
 

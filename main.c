@@ -59,7 +59,9 @@ static void usage(const char * app_name)
 		"        -r (U|J|E) Set region to US, Japan or Europe respectively\n"
 		"        -l         Enable emulator core log output (disabled by default)\n"
 		"        -w         Enable widescreen hack (disabled by default)\n"
-		"        -s FILE    Load save state from specified file\n",
+		"        -s FILE    Load save state from specified file\n"
+		"        -c FILE    Load specified file as a cartridge\n"
+		"        -d FILE    Load specified file as a disc\n",
 		app_name
 	);
 }
@@ -121,6 +123,8 @@ int main(int argc, char ** argv)
 	int height;
 	int region;
 	const char * filename;
+	const char * cartridge_file;
+	const char * cd_file;
 	const char * state_file;
 	int i;
 	int running;
@@ -160,6 +164,8 @@ int main(int argc, char ** argv)
 	widescreen_enabled = cc_false;
 	region = REGION_UNSPECIFIED;
 	filename = NULL;
+	cartridge_file = NULL;
+	cd_file = NULL;
 	state_file = NULL;
 	
 	/*
@@ -186,7 +192,7 @@ int main(int argc, char ** argv)
 				case 'r':
 					if (i == argc - 1)
 					{
-						printf("unexpected end of args\n");
+						printf("region not specified\n");
 						return ret;
 					}
 					else
@@ -221,7 +227,7 @@ int main(int argc, char ** argv)
 				case 's':
 					if (i == argc - 1)
 					{
-						printf("unexpected end of args\n");
+						printf("state file not specified\n");
 						return ret;
 					}
 					else
@@ -234,6 +240,46 @@ int main(int argc, char ** argv)
 						else
 						{
 							printf("specify only 1 state file\n");
+							return ret;
+						}
+					}
+					break;
+				case 'c':
+					if (i == argc - 1)
+					{
+						printf("cartridge file not specified\n");
+						return ret;
+					}
+					else
+					{
+						i++;
+						if (!cartridge_file)
+						{
+							cartridge_file = argv[i];
+						}
+						else
+						{
+							printf("specify only 1 cartridge file\n");
+							return ret;
+						}
+					}
+					break;
+				case 'd':
+					if (i == argc - 1)
+					{
+						printf("cd file not specified\n");
+						return ret;
+					}
+					else
+					{
+						i++;
+						if (!cd_file)
+						{
+							cd_file = argv[i];
+						}
+						else
+						{
+							printf("specify only 1 cd file\n");
 							return ret;
 						}
 					}
@@ -259,7 +305,7 @@ int main(int argc, char ** argv)
 		}
 	}
 	
-	if (!filename)
+	if (!filename && !cartridge_file && !cd_file)
 	{
 		printf("no bootable media filename specified\n");
 		return ret;
@@ -340,10 +386,29 @@ int main(int argc, char ** argv)
 	ClownMDEmu_Constant_Initialise();
 	emulator_init(emu);
 	emulator_set_options(emu, log_enabled, widescreen_enabled);
-	if (!emulator_load_file(emu, filename))
+	if (cartridge_file)
 	{
-		printf("unable to load file\n");
-		goto cleanup_x11_window;
+		if (!emulator_load_cartridge(emu, cartridge_file))
+		{
+			printf("unable to load cartridge\n");
+			goto cleanup_x11_window;
+		}
+	}
+	if (cd_file)
+	{
+		if (!emulator_load_cd(emu, cd_file))
+		{
+			printf("unable to load cd\n");
+			goto cleanup_x11_window;
+		}
+	}
+	if (!cartridge_file && !cd_file)
+	{
+		if (!emulator_load_file(emu, filename))
+		{
+			printf("unable to load file\n");
+			goto cleanup_x11_window;
+		}
 	}
 	emulator_set_region(emu, region);
 	emulator_init_audio(emu);

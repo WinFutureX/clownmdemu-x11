@@ -385,9 +385,9 @@ void emulator_set_region(emulator * emu, region force_region)
 	region detect_region = force_region;
 	if (detect_region == REGION_UNSPECIFIED)
 	{
-		if (emu->cd_boot || emu->rom_size >= 0x1F3)
+		if (emu->cartridge_inserted == cc_false || emu->rom_size >= 0x1F3)
 		{
-			char * region_list = emu->cd_boot ? emu->cd_regions : emu->rom_regions;
+			char * region_list = emu->cartridge_inserted == cc_false ? emu->cd_regions : emu->rom_regions;
 			/*
 			 * in order: us, japan then europe, otherwise fail
 			 * first we try the old style
@@ -471,12 +471,12 @@ void emulator_reset(emulator * emu, cc_bool hard)
 {
 	if (hard)
 	{
-		ClownMDEmu_HardReset(&emu->clownmdemu, !emu->cd_boot, emu->cd_boot);
+		ClownMDEmu_HardReset(&emu->clownmdemu, emu->cartridge_inserted, emu->cd_inserted);
 		emu->cartridge_has_save_ram = emu->clownmdemu.state.external_ram.non_volatile;
 	}
 	else
 	{
-		ClownMDEmu_SoftReset(&emu->clownmdemu, !emu->cd_boot, emu->cd_boot);
+		ClownMDEmu_SoftReset(&emu->clownmdemu, emu->cartridge_inserted, emu->cd_inserted);
 	}
 	/*printf("sram: size %ld nv %d data_size %d type %d map_in %d\n",
 		emu->clownmdemu.state.external_ram.size,
@@ -518,12 +518,9 @@ int emulator_load_file(emulator * emu, const char * filename)
 	{
 		if (CDReader_IsMegaCDGame(&emu->cd))
 		{
-			emu->cd_boot = cc_true;
-			printf("booting cd\n");
 			return 1;
 		}
 		emulator_unload_cd(emu);
-		emu->cd_boot = cc_false;
 	}
 	return emulator_load_cartridge(emu, filename);
 }
@@ -574,11 +571,11 @@ int emulator_load_cartridge(emulator * emu, const char * filename)
 	}
 	emu->rom_buf = tmp;
 	ClownMDEmu_SetCartridge(&emu->clownmdemu, emu->rom_buf, emu->rom_size);
-	printf("booting cartridge, loaded %ld bytes\n", size);
 	file = strdup(filename);
 	emu->cartridge_filename = get_basename(file);
 	free(file);
 	emulator_load_sram(emu);
+	emu->cartridge_inserted = cc_true;
 	return 1;
 }
 
@@ -596,6 +593,7 @@ void emulator_unload_cartridge(emulator * emu)
 		free(emu->cartridge_filename);
 		emu->cartridge_filename = NULL;
 	}
+	emu->cartridge_inserted = cc_false;
 }
 
 int emulator_load_cd(emulator * emu, const char * filename)
@@ -623,6 +621,7 @@ int emulator_load_cd(emulator * emu, const char * filename)
 		emu->cd_filename = get_basename(tmp);
 		free(tmp);
 	}
+	emu->cd_inserted = cc_true;
 	return 1;
 }
 
@@ -637,6 +636,7 @@ void emulator_unload_cd(emulator * emu)
 		free(emu->cd_filename);
 		emu->cd_filename = NULL;
 	}
+	emu->cd_inserted = cc_false;
 }
 
 void emulator_load_sram(emulator * emu)
@@ -786,6 +786,7 @@ void emulator_save_state(emulator * emu)
 	char * comb;
 	char * strip;
 	size_t written;
+	f = NULL;
 	strip = strip_ext(emu->cartridge_filename ? emu->cartridge_filename : emu->cd_filename);
 	comb = append_ext(strip, "state");
 	path = build_file_path(get_exe_dir(), comb);
@@ -834,11 +835,14 @@ void emulator_shutdown_audio(emulator * emu)
 
 void emulator_shutdown(emulator * emu)
 {
-	if (emu->cd_boot)
+	if (emu->cd_inserted)
 	{
 		emulator_unload_cd(emu);
 	}
 	CDReader_Deinitialise(&emu->cd);
-	emulator_unload_cartridge(emu);
+	if (emu->cartridge_inserted)
+	{
+		emulator_unload_cartridge(emu);
+	}
 	emulator_shutdown_audio(emu);
 }
