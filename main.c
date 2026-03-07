@@ -532,10 +532,13 @@ skip_audio_init:
 		
 		if (emu->width > 0 && emu->height > 0)
 		{
+			if (emu->width != x_window_buffer->width || emu->height != x_window_buffer->height)
+			{
+				XClearWindow(display, window);
+			}
 			x_window_buffer->width = emu->width;
 			x_window_buffer->height = emu->height;
 			x_window_buffer->bytes_per_line = emu->width * 4;
-			XClearWindow(display, window);
 			XPutImage(display, window, default_gc, x_window_buffer, 0, 0, (width - emu->width) / 2, (height - emu->height) / 2, width, height);
 		}
 		
