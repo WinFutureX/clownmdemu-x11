@@ -43,16 +43,28 @@ FILE * file_open_truncate(const char * filename);
 int file_close(FILE * stream);
 
 /*
+ * reads (size * count) items from an open file
+ * returns the number of items successfully read (up to count)
+ */
+size_t file_read(void * dst, size_t size, size_t count, FILE * stream);
+
+/*
+ * writes (size * count) items to an open file
+ * returns the number of items successfully written (up to count)
+ */
+size_t file_write(const void * src, size_t size, size_t count, FILE * stream);
+
+/*
  * reads bytes from an open file
  * returns the number of bytes successfully read
  */
-size_t file_read(void * dst, size_t bytes, FILE * stream);
+size_t file_read_bytes(void * dst, size_t bytes, FILE * stream);
 
 /*
  * writes bytes to an open file
  * returns the number of bytes successfully written
  */
-size_t file_write(const void * src, size_t bytes, FILE * stream);
+size_t file_write_bytes(const void * src, size_t bytes, FILE * stream);
 
 /*
  * sets position counter of an open file

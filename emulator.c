@@ -150,7 +150,7 @@ static cc_s16f emulator_callback_save_file_read(void * data)
 	}
 	else
 	{
-		return file_read(&byte, sizeof(byte), e->bram) < sizeof(byte) ? -1 : byte;
+		return file_read_bytes(&byte, sizeof(byte), e->bram) < sizeof(byte) ? -1 : byte;
 	}
 }
 
@@ -172,7 +172,7 @@ static void emulator_callback_save_file_write(void * data, cc_u8f val)
 	emulator * e = (emulator *) data;
 	if (e->bram)
 	{
-		file_write(&val, sizeof(unsigned char), e->bram);
+		file_write_bytes(&val, sizeof(unsigned char), e->bram);
 	}
 }
 
@@ -258,12 +258,12 @@ static int emulator_callback_clowncd_close(void * stream)
 
 static size_t emulator_callback_clowncd_read(void * buf, size_t size, size_t count, void * stream)
 {
-	/* file_read() does not work here as it breaks cd reads for some reason */
+	/* file_read_bytes() does not work here as it breaks cd reads for some reason */
 	if (!buf || size == 0 || count == 0 || !stream)
 	{
 		return 0;
 	}
-	return fread(buf, size, count, (FILE *) stream);
+	return file_read(buf, size, count, (FILE *) stream);
 }
 
 static size_t emulator_callback_clowncd_write(const void * buf, size_t size, size_t count, void * stream)
@@ -273,7 +273,7 @@ static size_t emulator_callback_clowncd_write(const void * buf, size_t size, siz
 		return 0;
 	}
 	
-	return fwrite(buf, size, count, (FILE *) stream);
+	return file_write(buf, size, count, (FILE *) stream);
 }
 
 static long emulator_callback_clowncd_tell(void * stream)
@@ -695,7 +695,7 @@ void emulator_save_sram(emulator * emu)
 	}
 	if (f)
 	{
-		file_write(emu->clownmdemu.state.external_ram.buffer, emu->clownmdemu.state.external_ram.size, f);
+		file_write_bytes(emu->clownmdemu.state.external_ram.buffer, emu->clownmdemu.state.external_ram.size, f);
 		file_close(f);
 	}
 	else
@@ -743,16 +743,16 @@ void emulator_load_state(emulator * emu, const char * filename)
 				}
 				else
 				{
-					read = file_read(tmp, sizeof(save_state_magic), f);
+					read = file_read_bytes(tmp, sizeof(save_state_magic), f);
 					if (read < sizeof(save_state_magic) || strcmp(save_state_magic, tmp) != 0)
 					{
 						printf("state file signature invalid\n");
 					}
 					else
 					{
-						read += file_read(&emu->state_backup, sizeof(ClownMDEmu_StateBackup), f);
-						read += file_read(&emu->cd_backup, sizeof(CDReader_StateBackup), f);
-						read += file_read(emu->colors_backup, sizeof(palette), f);
+						read += file_read_bytes(&emu->state_backup, sizeof(ClownMDEmu_StateBackup), f);
+						read += file_read_bytes(&emu->cd_backup, sizeof(CDReader_StateBackup), f);
+						read += file_read_bytes(emu->colors_backup, sizeof(palette), f);
 						if (read != save_state_size)
 						{
 							printf("state read error, got %lu bytes, expected %lu\n", read, save_state_size);
@@ -798,10 +798,10 @@ void emulator_save_state(emulator * emu)
 		f = file_open_truncate(path);
 		if (f)
 		{
-			written = file_write(save_state_magic, sizeof(save_state_magic), f);
-			written += file_write(&emu->state_backup, sizeof(ClownMDEmu_StateBackup), f);
-			written += file_write(&emu->cd_backup, sizeof(CDReader_StateBackup), f);
-			written += file_write(&emu->colors_backup, sizeof(palette), f);
+			written = file_write_bytes(save_state_magic, sizeof(save_state_magic), f);
+			written += file_write_bytes(&emu->state_backup, sizeof(ClownMDEmu_StateBackup), f);
+			written += file_write_bytes(&emu->cd_backup, sizeof(CDReader_StateBackup), f);
+			written += file_write_bytes(&emu->colors_backup, sizeof(palette), f);
 			if (written != save_state_size)
 			{
 				printf("state write error, got %lu bytes, expected %lu\n", written, save_state_size);

@@ -51,7 +51,25 @@ int file_close(FILE * stream)
 	return fclose(stream) == 0 ? 1 : 0;
 }
 
-size_t file_read(void * dst, size_t bytes, FILE * stream)
+size_t file_read(void * dst, size_t size, size_t count, FILE * stream)
+{
+	if (!dst || !stream || size < 1 || count < 1)
+	{
+		return 0;
+	}
+	return fread(dst, size, count, stream);
+}
+
+size_t file_write(const void * src, size_t size, size_t count, FILE * stream)
+{
+	if (!src || !stream || size < 1 || count < 1)
+	{
+		return 0;
+	}
+	return fwrite(src, size, count, stream);
+}
+
+size_t file_read_bytes(void * dst, size_t bytes, FILE * stream)
 {
 	if (!dst || !stream || bytes < 1)
 	{
@@ -60,7 +78,7 @@ size_t file_read(void * dst, size_t bytes, FILE * stream)
 	return fread(dst, 1, bytes, stream);
 }
 
-size_t file_write(const void * src, size_t bytes, FILE * stream)
+size_t file_write_bytes(const void * src, size_t bytes, FILE * stream)
 {
 	if (!src || !stream || bytes < 1)
 	{
@@ -125,7 +143,7 @@ int file_load_to_buffer(const char * filename, unsigned char ** out_buf, size_t 
 		{
 			if (file_seek(f, 0, SEEK_SET))
 			{
-				if (file_read(buf, (size_t) size, f) == (size_t) size)
+				if (file_read_bytes(buf, (size_t) size, f) == (size_t) size)
 				{
 					*out_buf = buf;
 					*out_size = size;
