@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "common/core/clownmdemu.h"
+#include "common/core/source/clownmdemu.h"
 #include "common/cd-reader.h"
 #include "common/mixer.h"
 
