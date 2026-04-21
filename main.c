@@ -55,13 +55,14 @@ static void usage(const char * app_name)
 	printf(
 		"Usage: %s [OPTIONS] FILE\n"
 		"Options:\n"
-		"        -h, -?     Print this help text\n"
-		"        -r (U|J|E) Set region to US, Japan or Europe respectively\n"
-		"        -l         Enable emulator core log output (disabled by default)\n"
-		"        -w         Enable widescreen hack (disabled by default)\n"
-		"        -s FILE    Load save state from specified file\n"
-		"        -c FILE    Load specified file as a cartridge\n"
-		"        -d FILE    Load specified file as a disc\n",
+		"\t-h, -?     Print this help text\n"
+		"\t-r (U|J|E) Set region to US, Japan or Europe respectively\n"
+		"\t-l         Enable emulator core log output (disabled by default)\n"
+		"\t-w         Enable widescreen hack (disabled by default)\n"
+		"\t-s FILE    Load save state from specified file\n"
+		"\t-c FILE    Load specified file as a cartridge\n"
+		"\t-d FILE    Load specified file as a disc\n"
+		"\t-v         List Git version hashes (Git builds only)\n",
 		app_name
 	);
 }
@@ -189,6 +190,14 @@ int main(int argc, char ** argv)
 				case '?':
 					usage(argv[0]);
 					return ret;
+				case 'v':
+#if defined(GIT_COMMIT_HASH_ROOT) && defined(GIT_COMMIT_HASH_COMMON)
+					printf("main repo hash: %s\n", GIT_COMMIT_HASH_ROOT);
+					printf("common repo hash: %s\n", GIT_COMMIT_HASH_COMMON);
+#else
+					printf("non-git build - version hash unavailable\n");
+#endif
+					return 0;
 				case 'r':
 					if (i == argc - 1)
 					{

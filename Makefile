@@ -31,6 +31,11 @@ endif
 CFLAGS := -std=gnu89 $(OPT_CFLAGS) $(X11_CFLAGS) $(AUDIO_CFLAGS)
 LDFLAGS := -lm $(X11_LDFLAGS) $(AUDIO_LDFLAGS)
 
+GIT_INFO := $(shell git rev-parse 2> /dev/null; echo $$?)
+ifeq ($(GIT_INFO), 0)
+CFLAGS += -DGIT_COMMIT_HASH_ROOT=\"$(shell git rev-parse HEAD)\" -DGIT_COMMIT_HASH_COMMON=\"$(shell git -C common rev-parse HEAD)\"
+endif
+
 ifeq ($(STRICT), $(filter $(STRICT), 1 Y y))
 CFLAGS += -Wall -Wextra
 endif
