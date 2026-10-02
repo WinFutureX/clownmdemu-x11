@@ -224,6 +224,16 @@ static cc_bool emulator_callback_save_file_size_obtain(void * data, const char *
 	return file_size > 0 ? cc_true : cc_false;
 }
 
+static void emulator_callback_sound_chip_write(void * data, ClownMDEmu_SoundChip chip, cc_u8f addr, cc_u8f val, cc_u32f cycle)
+{
+	/* TODO: vgm logger? */
+	(void) data;
+	(void) chip;
+	(void) addr;
+	(void) val;
+	(void) cycle;
+}
+
 static void emulator_callback_log(void * data, const char * fmt, va_list args)
 {
 	emulator * e = (emulator *) data;
@@ -346,6 +356,7 @@ void emulator_init(emulator * emu)
 	emu->callbacks.save_file_closed = emulator_callback_save_file_close;
 	emu->callbacks.save_file_removed = emulator_callback_save_file_remove;
 	emu->callbacks.save_file_size_obtained = emulator_callback_save_file_size_obtain;
+	emu->callbacks.sound_chip_written = emulator_callback_sound_chip_write;
 	
 	emu->cd_callbacks.open = emulator_callback_clowncd_open;
 	emu->cd_callbacks.close = emulator_callback_clowncd_close;
